@@ -3,7 +3,7 @@ from .user import User
 
 
 __all__ = [
-    "Token", 
-    "TokenData", 
+    "Token",
+    "TokenData",
     "User",
 ]

@@ -8,4 +8,3 @@ class User(BaseModel):
     email: str
     full_name: Optional[str] = None
     roles: list[str] = []
-    

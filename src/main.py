@@ -5,13 +5,15 @@ from config import app_settings
 
 
 app = FastAPI(
-    title=app_settings.APP_NAME, 
-    version=app_settings.APP_VERSION, 
+    title=app_settings.APP_NAME,
+    version=app_settings.APP_VERSION,
     docs_url="/api/docs",
-    openapi_url="/api/openapi.json")
+    openapi_url="/api/openapi.json",
+)
 
 app.include_router(api_router, prefix="/api")
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
