@@ -7,11 +7,12 @@
 [![OAuth](https://img.shields.io/badge/OAuth_2.0-✓-yellow)](https://oauth.net/2/)
 [![License](https://img.shields.io/badge/License-MIT-red)](https://opensource.org/licenses/MIT)
 
-##  Документация 
+## Документация
 
 ### Примеры использования
 
 #### Прямая аутентификация по логину/паролю
+
 ```bash
 curl -X POST \
   '{$HOST}/api/v1/auth/token' \
@@ -20,6 +21,7 @@ curl -X POST \
 ```
 
 **ответ**
+
 ```json
 {
   "access_token": "string",
@@ -31,7 +33,8 @@ curl -X POST \
 ```
 
 #### Обновление токена
-```bash 
+
+```bash
 curl -X POST \
   '{$HOST}/api/v1/auth/refresh-token' \
   -H 'Content-Type: application/x-www-form-urlencoded' \
@@ -40,7 +43,7 @@ curl -X POST \
 
 **ответ**
 
-```json 
+```json
 {
   "access_token": "string",
   "token_type": "string",
@@ -51,6 +54,7 @@ curl -X POST \
 ```
 
 #### Получение информации о текущем пользователе
+
 ```bash
 curl -X GET \
   '{$HOST}/api/v1/users/me' \
@@ -58,7 +62,8 @@ curl -X GET \
 ```
 
 **Ответ**
-```json 
+
+```json
 {
   "id": "string",
   "username": "string",
@@ -68,9 +73,33 @@ curl -X GET \
 }
 ```
 
-#### Выход из системы 
+#### Выход из системы
+
 ```bash
 curl -X GET \
   '{$HOST}/api/v1/auth/logout' \
   -H 'Authorization: Bearer eyJhbGciOi...'
   ```
+
+### basic configuration
+
+```.env
+# FastAPI
+APP_HOST=0.0.0.0
+APP_PORT=8000
+APP_RELOAD=True
+MAIN_API_BASE_URL=""
+
+# Redis
+REDIS_HOST=redis
+REDIS_PORT=6379
+REDIS_DB=0
+REDIS_PASSWORD=your_redis_password_123
+REDIS_SSL=False
+
+#Connecting to sso.guap
+CLIENT_ID=""
+CLIENT_SECRET=""
+DOMEN=""
+
+```
