@@ -11,10 +11,7 @@ services:
       redis:
         condition: service_healthy
     command: >
-      sh -c "uvicorn main:app
-      --host ${APP_HOST}
-      --port ${APP_PORT}
-      --reload ${APP_RELOAD}"
+      sh -c "uvicorn main:app --host ${APP_HOST} --port ${APP_PORT}"
 
   redis:
     image: redis:7-alpine

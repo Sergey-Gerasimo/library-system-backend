@@ -13,7 +13,6 @@ class AppSettings:
     APP_RELOAD: bool = env.bool("APP_RELOAD", default=False)
 
     DEBUG: bool = env.bool("DEBUG", default=False)
-    MAIN_API_BASE_URL: str = env.str("MAIN_API_BASE_URL")
 
 
 app_settings = AppSettings()

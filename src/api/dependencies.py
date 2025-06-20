@@ -2,7 +2,7 @@ from services.auth_service import AuthService
 from services.user_service import UserService
 from redis.asyncio import Redis
 
-from typing import Generator, Any
+from typing import Any, AsyncGenerator
 
 from config import services_settings
 
@@ -15,7 +15,7 @@ def get_user_service() -> UserService:
     return UserService()
 
 
-async def get_redis() -> Redis:
+async def get_redis() -> AsyncGenerator[Redis, Any]:
 
     redis = Redis(
         host=services_settings.REDIS_SETTINGS.HOST,
