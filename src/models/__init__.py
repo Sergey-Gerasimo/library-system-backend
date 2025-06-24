@@ -6,6 +6,8 @@ from .models import (
     FileType,
     BookHistory,
     BookHistoryAction,
+    Genre,
+    Author,
 )
 
 __all__ = [
@@ -16,4 +18,6 @@ __all__ = [
     "FileType",
     "BookHistory",
     "BookHistoryAction",
+    "Genre",
+    "Author",
 ]  # Export all models

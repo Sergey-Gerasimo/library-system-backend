@@ -1,4 +1,4 @@
-from shemas import Token
+from schemas import Token
 from fastapi import HTTPException, status
 import httpx
 from config.keycloak import openid_config, keycloak_settings

@@ -1,13 +1,24 @@
 from enum import Enum
-from sqlalchemy import Enum as SQLAlchemyEnum, ForeignKey, String, JSON, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import (
+    Enum as SQLAlchemyEnum,
+    ForeignKey,
+    String,
+    JSON,
+    Text,
+    select,
+    func,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship, column_property
 from typing import Annotated, Optional, List
 from datetime import datetime, timezone
+
+from uuid import UUID, uuid4
 
 from database import Base
 
 get_current_time = lambda: datetime.now(timezone.utc)
 idpk = Annotated[int, mapped_column(primary_key=True)]
+uuid = Annotated[UUID, mapped_column(default=uuid4, primary_key=True)]
 created_at = Annotated[datetime, mapped_column(default=get_current_time)]
 
 
@@ -20,7 +31,7 @@ class UserRole(str, Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[idpk]
+    id: Mapped[uuid]
     username: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     email: Mapped[str] = mapped_column(String(100), unique=True, index=True)
     full_name: Mapped[Optional[str]] = mapped_column(String(100))
@@ -36,40 +47,14 @@ class FileType(str, Enum):
     PDF = "pdf"
 
 
-class Author(Base):
-    __tablename__ = "authors"
-
-    id: Mapped[idpk]
-    name: Mapped[str] = mapped_column(String(100), unique=True, index=True)
-    bio: Mapped[Optional[str]] = mapped_column(Text)
-
-    books: Mapped[List["Book"]] = relationship(
-        back_populates="author",
-        lazy="raise",
-    )
-
-
-class Genre(Base):
-    __tablename__ = "genres"
-
-    id: Mapped[idpk]
-    name: Mapped[str] = mapped_column(String(50), unique=True, index=True)
-    description: Mapped[Optional[str]] = mapped_column(Text)
-
-    books: Mapped[List["Book"]] = relationship(
-        back_populates="genre",
-        lazy="raise",
-    )
-
-
 class Book(Base):
     __tablename__ = "books"
 
-    id: Mapped[idpk]
+    id: Mapped[uuid]
     title: Mapped[str] = mapped_column(String(200), index=True)
     description: Mapped[Optional[str]] = mapped_column(Text)
-    author_id: Mapped[int] = mapped_column(ForeignKey("authors.id"))
-    genre_id: Mapped[Optional[int]] = mapped_column(ForeignKey("genres.id"))
+    author_id: Mapped[UUID] = mapped_column(ForeignKey("authors.id"))
+    genre_id: Mapped[UUID] = mapped_column(ForeignKey("genres.id"))
     year: Mapped[int] = mapped_column(index=True)
     is_published: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[created_at]
@@ -92,11 +77,50 @@ class Book(Base):
     )
 
 
+class Author(Base):
+    __tablename__ = "authors"
+
+    id: Mapped[uuid]
+    name: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    bio: Mapped[Optional[str]] = mapped_column(Text)
+
+    books: Mapped[List["Book"]] = relationship(
+        back_populates="author",
+        lazy="raise",
+    )
+
+    best_books: Mapped[List["Book"]] = relationship(
+        secondary="books",  # Используем secondary для сложных условий
+        viewonly=True,
+        lazy="raise",
+        order_by="desc(Book.created_at)",
+        secondaryjoin="and_(Book.author_id == Author.id, Book.is_published == True)",
+    )
+
+    books_count: Mapped[int] = column_property(
+        select(func.count(Book.id)).where(Book.author_id == id).scalar_subquery(),
+        deferred=True,
+    )
+
+
+class Genre(Base):
+    __tablename__ = "genres"
+
+    id: Mapped[uuid]
+    name: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+
+    books: Mapped[List["Book"]] = relationship(
+        back_populates="genre",
+        lazy="raise",
+    )
+
+
 class BookFile(Base):
     __tablename__ = "book_files"
 
-    id: Mapped[idpk]
-    book_id: Mapped[int] = mapped_column(ForeignKey("books.id", ondelete="CASCADE"))
+    id: Mapped[uuid]
+    book_id: Mapped[UUID] = mapped_column(ForeignKey("books.id", ondelete="CASCADE"))
     storage_key: Mapped[str] = mapped_column(String(255), unique=True)  # Путь в S3
     file_type: Mapped[FileType] = mapped_column(SQLAlchemyEnum(FileType))
     original_name: Mapped[str] = mapped_column(String(100))
@@ -119,9 +143,9 @@ class BookHistoryAction(str, Enum):
 class BookHistory(Base):
     __tablename__ = "book_history"
 
-    id: Mapped[idpk]
-    book_id: Mapped[int] = mapped_column(ForeignKey("books.id"))
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    id: Mapped[uuid]
+    book_id: Mapped[UUID] = mapped_column(ForeignKey("books.id"))
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     action: Mapped[BookHistoryAction] = mapped_column(SQLAlchemyEnum(BookHistoryAction))
     changed_at: Mapped[created_at]
     old_values: Mapped[Optional[dict]] = mapped_column(JSON)

@@ -3,13 +3,13 @@ from fastapi.security import OAuth2PasswordBearer
 
 from services.auth_service import AuthService
 from services.user_service import UserService
-from shemas import User
+from schemas import User
 from api.dependencies import get_auth_service, get_user_service
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-@router.get("/users/me", response_model=User)
+@router.get("/me", response_model=User)
 async def get_curent_user(
     token: str = Depends(OAuth2PasswordBearer(tokenUrl="token")),
     auth_service: AuthService = Depends(get_auth_service),

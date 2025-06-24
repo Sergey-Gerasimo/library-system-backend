@@ -1,5 +1,6 @@
 from services.auth_service import AuthService
 from services.user_service import UserService
+from services.book_storage import BookStorage
 from config import services_settings
 
 from fastapi import Depends
@@ -37,6 +38,12 @@ async def get_db() -> AsyncGenerator[AsyncSession, Any]:
 
 async def get_auth_service() -> AsyncGenerator[AuthService, Any]:
     yield AuthService()
+
+
+async def get_book_service(
+    redis: Redis = Depends(get_redis),
+) -> AsyncGenerator[BookStorage, Any]:
+    yield BookStorage(redis=redis)
 
 
 async def get_user_service(
