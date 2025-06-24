@@ -90,7 +90,7 @@ class Author(Base):
     )
 
     best_books: Mapped[List["Book"]] = relationship(
-        secondary="books",  # Используем secondary для сложных условий
+        secondary="books",
         viewonly=True,
         lazy="raise",
         order_by="desc(Book.created_at)",
@@ -113,6 +113,14 @@ class Genre(Base):
     books: Mapped[List["Book"]] = relationship(
         back_populates="genre",
         lazy="raise",
+    )
+
+    best_books: Mapped[List["Book"]] = relationship(
+        secondary="books",
+        viewonly=True,
+        lazy="raise",
+        order_by="desc(Book.created_at)",
+        secondaryjoin="and_(Book.genre_id == Genre.id, Book.is_published == True)",
     )
 
 

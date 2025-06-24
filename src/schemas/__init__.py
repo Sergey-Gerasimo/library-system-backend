@@ -1,6 +1,7 @@
 from .token import Token, TokenData
 from .user import User
 from .author import AuthorBase, AuthorCreate, AuthorInDB, AuthorUpdate
+from .genre import GenreBase, GenreCreate, GenreInDB, GenreUpdate, GenreWithBooks
 from .book import (
     BookCreate,
     BookFileResponse,
@@ -26,4 +27,9 @@ __all__ = [
     "AuthorCreate",
     "AuthorInDB",
     "AuthorUpdate",
+    "GenreBase",
+    "GenreCreate",
+    "GenreInDB",
+    "GenreUpdate",
+    "GenreWithBooks",
 ]

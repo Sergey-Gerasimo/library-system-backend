@@ -6,7 +6,8 @@ from sqlalchemy import update, delete
 import asyncio
 
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy.orm import Session, selectinload, joinedload
+from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from uuid import UUID
 
@@ -37,7 +38,7 @@ class BookService:
     файлов в S3 хранилище и поддержанием истории изменений.
     """
 
-    def __init__(self, db: Session, storage: BookStorage):
+    def __init__(self, db: AsyncSession, storage: BookStorage):
         """Инициализирует сервис книг.
 
         :param db: Асинхронная сессия базы данных SQLAlchemy
