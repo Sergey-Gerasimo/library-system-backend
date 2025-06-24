@@ -325,13 +325,15 @@ class BookService:
 
         return book
 
-    async def delete_book(self, book_id: UUID, user_id: UUID) -> None:
+    async def delete_book(self, book_id: UUID, user_id: UUID) -> Book:
         """Удаляет книгу и все связанные с ней данные.
 
         :param book_id: ID удаляемой книги
         :type book_id: UUID
         :param user_id: ID пользователя, выполняющего удаление
         :type user_id: UUID
+        :return: Удаленная книга
+        :rtype: Book
         :raises HTTPException: 404 если книга не найдена, 500 при ошибках удаления
         """
         result = await self.db.execute(select(Book).where(Book.id == book_id))
@@ -368,6 +370,8 @@ class BookService:
 
             await self.db.delete(db_book)
             await self.db.commit()
+
+            return db_book
 
         except Exception as e:
             await self.db.rollback()

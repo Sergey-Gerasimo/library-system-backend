@@ -1,6 +1,12 @@
-from services.auth_service import AuthService
-from services.user_service import UserService
-from services.book_storage import BookStorage
+from services import (
+    GenreService,
+    AuthorService,
+    AuthService,
+    BookService,
+    S3Client,
+    BookStorage,
+    UserService,
+)
 from config import services_settings
 
 from fastapi import Depends
@@ -41,9 +47,26 @@ async def get_auth_service() -> AsyncGenerator[AuthService, Any]:
 
 
 async def get_book_service(
+    db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),
 ) -> AsyncGenerator[BookStorage, Any]:
-    yield BookStorage(redis=redis)
+
+    book_storage = BookStorage(redis=redis)
+    yield BookService(db, book_storage)
+
+
+async def get_genre_service(
+    db: AsyncSession = Depends(get_db),
+) -> AsyncGenerator[GenreService, Any]:
+
+    yield GenreService(db)
+
+
+async def get_author_service(
+    db: AsyncSession = Depends(get_db),
+) -> AsyncGenerator[AuthorService, Any]:
+
+    yield AuthorService(db)
 
 
 async def get_user_service(

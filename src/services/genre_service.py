@@ -79,16 +79,17 @@ class GenreService:
 
         return updated_genre
 
-    async def delete_genre(self, genre_id: UUID) -> bool:
+    async def delete_genre(self, genre_id: UUID) -> Genre:
         """
         Удаление жанра по ID.
         :param genre_id: UUID идентификатор жанра
-        :return: True если удаление успешно, False если жанр не найден
+        :return: Жанр
+        :rtype: Genre
         """
         stmt = delete(Genre).where(Genre.id == genre_id)
         result = await self.db.execute(stmt)
         await self.db.commit()
-        return result.rowcount > 0
+        return result
 
     async def get_best_books(self, genre_id: UUID, limit: int = 5) -> List[Book]:
         """
