@@ -84,22 +84,45 @@ curl -X GET \
 ### basic configuration
 
 ```.env
-# FastAPI
+# ===== Core Settings =====
 APP_HOST=0.0.0.0
 APP_PORT=8000
 APP_RELOAD=True
-MAIN_API_BASE_URL=""
+ENVIRONMENT=local  # local/staging/prod
 
-# Redis
+# ===== PostgreSQL =====
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_USER=app_user
+POSTGRES_PASSWORD=strong_password_123!
+POSTGRES_DB=app_db
+
+
+# ===== Redis =====
 REDIS_HOST=redis
 REDIS_PORT=6379
+REDIS_PASSWORD=redis_password_456!
 REDIS_DB=0
-REDIS_PASSWORD=your_redis_password_123
 REDIS_SSL=False
+REDIS_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${REDIS_DB}
 
-#Connecting to sso.guap
+# ===== S3 Storage =====
+# Локальный MinIO
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_API_PORT=9000
+MINIO_CONSOLE_PORT=9001
+
+AWS_ACCESS_KEY_ID=${MINIO_ACCESS_KEY}
+AWS_SECRET_ACCESS_KEY=${MINIO_SECRET_KEY}
+S3_BUCKET_NAME=app-storage
+S3_REGION_NAME=us-east-1
+
+S3_ENDPOINT_URL=http://minio:9000
+
+# ===== SSO Auth =====
 CLIENT_ID=""
 CLIENT_SECRET=""
-DOMEN=""
+DOMAIN=""
 
 ```

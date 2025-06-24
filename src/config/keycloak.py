@@ -8,7 +8,7 @@ class KeycloakSettings:
 
     CLIENT_ID: str = env.str("CLIENT_ID")
     CLIENT_SECRET: str = env.str("CLIENT_SECRET")
-    REDIRECT_URL: str = env.str("DOMEN") + "/auth/callback"
+    REDIRECT_URL: str = env.str("DOMEN", default="localhost") + "/auth/callback"
     SCOPE: str = env.str("SCOPE", default="openid profile email")
 
 

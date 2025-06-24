@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordBearer
 
 from services.auth_service import AuthService
 from services.user_service import UserService
-from models import User
+from shemas import User
 from api.dependencies import get_auth_service, get_user_service
 
 router = APIRouter(prefix="/users", tags=["users"])

@@ -10,7 +10,7 @@ from config.keycloak import openid_config, client_config, keycloak_settings
 from config.settings import app_settings
 
 from services.auth_service import AuthService
-from models import Token
+from shemas import Token
 from api.dependencies import get_auth_service, get_user_service, get_redis
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -163,7 +163,7 @@ async def logout(
 
         await redis.delete(f"active_token:{token}")
 
-        await AuthService.logout()
+        await auth_service.logout()
 
         remaining_ttl = await redis.ttl(f"active_token:{token}")
 

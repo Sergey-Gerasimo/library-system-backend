@@ -7,4 +7,4 @@ class User(BaseModel):
     username: str
     email: str
     full_name: Optional[str] = None
-    roles: list[str] = []
+    roles: list[str] = list()
