@@ -53,6 +53,7 @@ class S3Client:
         try:
             async with self.session.create_client("s3", **self.config) as client:
                 yield client
+
         except BotoCoreError as e:
             if self.logger is not None:
                 self.logger.error(f"S3 connection error: {str(e)}")
@@ -83,8 +84,9 @@ class S3Client:
 
         try:
             async with self.get_client() as client:
-                await client.upload_fileobj(
-                    file_obj, self.bucket_name, s3_key, ExtraArgs=extra_args
+
+                await client.put_object(
+                    Body=file_obj, Bucket=self.bucket_name, Key=s3_key
                 )
                 return True
 

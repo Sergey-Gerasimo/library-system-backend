@@ -61,9 +61,6 @@ class AuthorInDB(AuthorBase):
     """Схема для возврата автора из БД"""
 
     id: UUID
-    books_count: Optional[int] = Field(
-        None, description="Количество книг автора", examples=[42]
-    )
 
     class Config:
         from_attributes = True  # Ранее называлось orm_mode=True в Pydantic v1

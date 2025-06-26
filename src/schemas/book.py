@@ -2,35 +2,25 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, field_validator
 import datetime
 
+from uuid import UUID
+
 from models import BookHistoryAction, FileType
 
 
 class BookCreate(BaseModel):
     title: str
     description: Optional[str] = None
-    author_id: int
-    genre_id: int
+    author_id: UUID
+    genre_id: UUID
     year: int
     is_published: bool = False
-
-    @field_validator("year")
-    @classmethod
-    def validate_year(cls, v):
-        current_year = datetime.datetime.now().year
-        if v > current_year + 5:  # Allow books up to 5 years in the future
-            raise ValueError(
-                f"Year cannot be more than 5 years in the future (current year: {current_year})"
-            )
-        if v < 1000:  # Assuming no books before 1000 AD
-            raise ValueError("Year must be after 1000")
-        return v
 
 
 class BookUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
-    author_id: Optional[int] = None
-    genre_id: Optional[int] = None
+    author_id: Optional[UUID] = None
+    genre_id: Optional[UUID] = None
     year: Optional[int] = None
     is_published: Optional[bool] = None
 
@@ -49,11 +39,11 @@ class BookUpdate(BaseModel):
 
 
 class BookResponse(BaseModel):
-    id: int
+    id: UUID
     title: str
     description: Optional[str]
-    author_id: int
-    genre_id: Optional[int]
+    author_id: UUID
+    genre_id: Optional[UUID]
     year: int
     is_published: bool
     created_at: datetime.datetime
@@ -65,7 +55,7 @@ class BookResponse(BaseModel):
 
 
 class BookFileResponse(BaseModel):
-    id: int
+    id: UUID
     file_type: FileType
     original_name: str
     size_bytes: int
@@ -81,7 +71,7 @@ class BookWithFilesResponse(BookResponse):
 
 
 class BookHistoryEntry(BaseModel):
-    id: int
+    id: UUID
     action: BookHistoryAction
     changed_at: datetime.datetime
     old_values: Optional[Dict[str, Any]]

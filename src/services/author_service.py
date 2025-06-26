@@ -37,6 +37,7 @@ class AuthorService:
             await self.db.commit()
             await self.db.refresh(author)
             return author
+
         except IntegrityError:
             await self.db.rollback()
             raise HTTPException(
@@ -55,27 +56,21 @@ class AuthorService:
         :raises HTTPException: 500 при ошибке базы данных
         """
         try:
-            query = (
-                select(Author)
-                .where(Author.id == author_id)
-                .options(
-                    selectinload(Author.best_books), selectinload(Author.books_count)
-                )
-            )
+            query = select(Author).where(Author.id == author_id)
 
             result = await self.db.execute(query)
             author = result.scalar_one_or_none()
-
-            if not author:
-                raise HTTPException(404, "Author not found")
-
-            return author
 
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Database error: {str(e)}",
             )
+
+        if not author:
+            raise HTTPException(404, "Author not found")
+
+        return author
 
     async def get_all_authors(self) -> List[Author]:
         """Получает список всех авторов.
@@ -138,6 +133,7 @@ class AuthorService:
                 status_code=status.HTTP_409_CONFLICT, detail="Database integrity error"
             )
         except HTTPException:
+            await self.db.rollback()
             raise  # Пробрасываем уже обработанные HTTPException
         except Exception as e:
             await self.db.rollback()

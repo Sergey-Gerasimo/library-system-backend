@@ -243,23 +243,25 @@ class BookService:
         :rtype: Book
         :raises HTTPException: 400 при ошибках валидации, 500 при ошибках создания
         """
-        cover_file, pdf_file = await self._validate_files(cover_file, pdf_file)
-
-        await self._get_author(book_data.author_id)
-        await self._get_genre(book_data.genre_id)
-
-        db_book = Book(**book_data.model_dump(exclude={"cover_file", "pdf_file"}))
-
-        cover_task = self._upload_book_file(
-            db_book.id, FileType.COVER, cover_file, cover_file.filename
-        )
-
-        pdf_task = self._upload_book_file(
-            db_book.id, FileType.PDF, pdf_file, pdf_file.filename
-        )
 
         async with self.db.begin():
             try:
+                cover_file, pdf_file = await self._validate_files(cover_file, pdf_file)
+
+                await self._get_author(book_data.author_id)
+                await self._get_genre(book_data.genre_id)
+
+                db_book = Book(
+                    **book_data.model_dump(exclude={"cover_file", "pdf_file"})
+                )
+
+                cover_task = self._upload_book_file(
+                    db_book.id, FileType.COVER, cover_file, cover_file.filename
+                )
+
+                pdf_task = self._upload_book_file(
+                    db_book.id, FileType.PDF, pdf_file, pdf_file.filename
+                )
                 self.db.add(db_book)
                 await self.db.flush()
 
@@ -336,13 +338,7 @@ class BookService:
         :rtype: Book
         :raises HTTPException: 404 если книга не найдена, 500 при ошибках удаления
         """
-        result = await self.db.execute(select(Book).where(Book.id == book_id))
-        db_book = result.scalars().first()
-
-        if not db_book:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Book not found"
-            )
+        db_book = await self.get_book(book_id=book_id)
 
         try:
             await self._record_history(
@@ -380,7 +376,12 @@ class BookService:
             )
 
     async def update_book(
-        self, book_id: UUID, book_data: BookUpdate, user_id: UUID
+        self,
+        book_id: UUID,
+        book_data: BookUpdate,
+        user_id: UUID,
+        cover_file: Optional[UploadFile] = None,
+        pdf_file: Optional[UploadFile] = None,
     ) -> Book:
         """Обновляет данные книги и/или файлы.
 
@@ -394,11 +395,7 @@ class BookService:
         :rtype: Book
         :raises HTTPException: 500 при ошибках обновления, 404 если книга не найдена
         """
-        result = await self.db.execute(select(Book).where(Book.id == book_id))
-        db_book = result.scalars().first()
-
-        if not db_book:
-            raise HTTPException(status_code=404, detail="Book not found")
+        db_book = await self.get_book(book_id=book_id)
 
         old_values = {
             "title": db_book.title,
@@ -423,15 +420,11 @@ class BookService:
                 update(Book).where(Book.id == book_id).values(**update_data)
             )
 
-            if book_data.cover_file:
-                await self._handle_file_update(
-                    db_book.id, FileType.COVER, book_data.cover_file
-                )
+            if cover_file:
+                await self._handle_file_update(db_book.id, FileType.COVER, cover_file)
 
-            if book_data.pdf_file:
-                await self._handle_file_update(
-                    db_book.id, FileType.PDF, book_data.pdf_file
-                )
+            if pdf_file:
+                await self._handle_file_update(db_book.id, FileType.PDF, pdf_file)
 
             await self._record_history(
                 book_id=db_book.id,

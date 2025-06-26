@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from uuid import UUID
-
+from typing import List
 
 from schemas import GenreCreate, GenreInDB, GenreUpdate, GenreWithBooks
 from api.dependencies import get_genre_service
@@ -10,6 +10,14 @@ from services import GenreService
 router = APIRouter(prefix="/genres", tags=["genres"])
 
 
+@router.get("/get_all")
+async def get_all_genre(
+    user_id: UUID,
+    genre_service: GenreService = Depends(get_genre_service),
+) -> List[GenreInDB]:
+    return await genre_service.get_all_genres()
+
+
 @router.get("/get")
 async def get_genre(
     genre_id: UUID,
@@ -17,14 +25,6 @@ async def get_genre(
     genre_service: GenreService = Depends(get_genre_service),
 ) -> GenreInDB:
     return await genre_service.get_genre_by_id(genre_id=genre_id)
-
-
-@router.get("/get_all")
-async def get_all_genre(
-    user_id: UUID,
-    genre_service: GenreService = Depends(get_genre_service),
-) -> GenreInDB:
-    return await genre_service.get_all_genres()
 
 
 @router.put("/update")

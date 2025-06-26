@@ -9,6 +9,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship, column_property
+from sqlalchemy.ext.hybrid import hybrid_property
 from typing import Annotated, Optional, List
 from datetime import datetime, timezone
 
@@ -39,7 +40,11 @@ class User(Base):
     roles: Mapped[List[UserRole]] = mapped_column(SQLAlchemyEnum(UserRole), default=[])
     is_active: Mapped[bool] = mapped_column(default=True)
 
-    changed_books: Mapped[List["BookHistory"]] = relationship(back_populates="user")
+    changed_books: Mapped[List["BookHistory"]] = relationship(
+        back_populates="user",
+        lazy="raise",
+        cascade="all, delete-orphan",
+    )
 
 
 class FileType(str, Enum):
@@ -53,8 +58,8 @@ class Book(Base):
     id: Mapped[uuid]
     title: Mapped[str] = mapped_column(String(200), index=True)
     description: Mapped[Optional[str]] = mapped_column(Text)
-    author_id: Mapped[UUID] = mapped_column(ForeignKey("authors.id"))
-    genre_id: Mapped[UUID] = mapped_column(ForeignKey("genres.id"))
+    author_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("authors.id"))
+    genre_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("genres.id"))
     year: Mapped[int] = mapped_column(index=True)
     is_published: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[created_at]
@@ -63,17 +68,15 @@ class Book(Base):
         back_populates="books",
         lazy="raise",
     )
-    genre: Mapped[Optional["Genre"]] = relationship(
+    genre: Mapped["Genre"] = relationship(
         back_populates="books",
         lazy="raise",
     )
     files: Mapped[List["BookFile"]] = relationship(
-        back_populates="book",
-        lazy="raise",
+        back_populates="book", lazy="selectin", cascade="all, delete-orphan"
     )
     history: Mapped[List["BookHistory"]] = relationship(
-        back_populates="book",
-        lazy="raise",
+        back_populates="book", lazy="selectin", cascade="all, delete-orphan"
     )
 
 
@@ -87,19 +90,16 @@ class Author(Base):
     books: Mapped[List["Book"]] = relationship(
         back_populates="author",
         lazy="raise",
+        cascade="all, delete-orphan",
     )
 
     best_books: Mapped[List["Book"]] = relationship(
         secondary="books",
+        primaryjoin="Author.id == Book.author_id",
+        secondaryjoin="and_(Book.author_id == Author.id, Book.is_published == True)",
         viewonly=True,
         lazy="raise",
         order_by="desc(Book.created_at)",
-        secondaryjoin="and_(Book.author_id == Author.id, Book.is_published == True)",
-    )
-
-    books_count: Mapped[int] = column_property(
-        select(func.count(Book.id)).where(Book.author_id == id).scalar_subquery(),
-        deferred=True,
     )
 
 
@@ -113,6 +113,7 @@ class Genre(Base):
     books: Mapped[List["Book"]] = relationship(
         back_populates="genre",
         lazy="raise",
+        cascade="all, delete-orphan",
     )
 
     best_books: Mapped[List["Book"]] = relationship(
@@ -129,7 +130,7 @@ class BookFile(Base):
 
     id: Mapped[uuid]
     book_id: Mapped[UUID] = mapped_column(ForeignKey("books.id", ondelete="CASCADE"))
-    storage_key: Mapped[str] = mapped_column(String(255), unique=True)  # Путь в S3
+    storage_key: Mapped[str] = mapped_column(String(255), unique=True)
     file_type: Mapped[FileType] = mapped_column(SQLAlchemyEnum(FileType))
     original_name: Mapped[str] = mapped_column(String(100))
     size_bytes: Mapped[int]

@@ -2,3 +2,5 @@
 *.env*
 *openid.json*
 *_data*
+*__pycache__*
+*.pytest_cache*

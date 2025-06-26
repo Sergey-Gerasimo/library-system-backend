@@ -6,6 +6,7 @@ from schemas import AuthorCreate, AuthorInDB, AuthorUpdate
 from api.dependencies import get_author_service
 from services import AuthorService
 
+from typing import Annotated
 
 router = APIRouter(prefix="/authors", tags=["authors"])
 

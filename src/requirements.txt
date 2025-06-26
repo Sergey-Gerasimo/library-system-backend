@@ -34,3 +34,8 @@ defusedxml==0.7.1
 click==8.1.8
 envparse==0.2.0
 typing_extensions==4.14.0
+
+# Тестирование 
+pytest
+pytest-asyncio
+pytest-cov
