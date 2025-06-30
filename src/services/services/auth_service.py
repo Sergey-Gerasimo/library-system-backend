@@ -5,10 +5,40 @@ from config.keycloak import openid_config, keycloak_settings
 
 
 class AuthService:
+    """Сервис аутентификации и авторизации.
+
+    Реализует логику работы с OAuth2/OpenID Connect через Keycloak,
+    предоставляя основные методы для аутентификации пользователей
+    и управления токенами.
+
+    Типы:
+        Token: Pydantic схема для работы с токенами доступа
+
+    Зависимости:
+        httpx: Для HTTP-запросов к Keycloak
+        fastapi.HTTPException: Для обработки ошибок API
+        config.keycloak: Конфигурация подключения к Keycloak
+
+    Пример использования:
+        token = await AuthService.direct_login(username="user", password="pass")
+        user_info = await AuthService.verify_access_token(token.access_token)
+    """
+
     @staticmethod
     async def _get_response(
         client: httpx.AsyncClient, username: str, password: str
     ) -> httpx.request:
+        """Внутренний метод для получения токена по учетным данным.
+
+        :param client: Асинхронный HTTP клиент
+        :type client: httpx.AsyncClient
+        :param username: Логин пользователя
+        :type username: str
+        :param password: Пароль пользователя
+        :type password: str
+        :return: Ответ от сервера авторизации
+        :rtype: httpx.request
+        """
         return await client.post(
             openid_config["token_endpoint"],
             data={
@@ -23,6 +53,19 @@ class AuthService:
 
     @staticmethod
     async def direct_login(username: str, password: str) -> Token:
+        """Аутентификация пользователя по логину и паролю.
+
+        Использует OAuth2 Resource Owner Password Credentials flow.
+
+        :param username: Логин пользователя
+        :type username: str
+        :param password: Пароль пользователя
+        :type password: str
+        :return: Токены доступа
+        :rtype: Token
+        :raises HTTPException: 400 при ошибке запроса
+        :raises HTTPException: При ошибке аутентификации (статус от Keycloak)
+        """
         try:
             async with httpx.AsyncClient() as client:
                 response = AuthService._get_response(client, username, password)
@@ -45,6 +88,16 @@ class AuthService:
 
     @staticmethod
     async def login_via_authtorization_code(code: str) -> Token:
+        """Аутентификация через код авторизации.
+
+        Использует OAuth2 Authorization Code flow.
+
+        :param code: Код авторизации
+        :type code: str
+        :return: Токены доступа
+        :rtype: Token
+        :raises HTTPException: При ошибке аутентификации
+        """
         async with httpx.AsyncClient() as client:
             token_data = {
                 "grant_type": "authorization_code",
@@ -75,6 +128,14 @@ class AuthService:
 
     @staticmethod
     async def refresh_token(refresh_token: str) -> Token:
+        """Обновление токена доступа.
+
+        :param refresh_token: Refresh token
+        :type refresh_token: str
+        :return: Новые токены доступа
+        :rtype: Token
+        :raises HTTPException: 401 при невалидном токене
+        """
         async with httpx.AsyncClient() as client:
             token_data = {
                 "grant_type": "refresh_token",
@@ -105,6 +166,14 @@ class AuthService:
 
     @staticmethod
     async def verify_access_token(token: str) -> dict:
+        """Валидация токена доступа.
+
+        :param token: Токен доступа
+        :type token: str
+        :return: Информация о токене
+        :rtype: dict
+        :raises HTTPException: 401 при невалидном токене
+        """
         async with httpx.AsyncClient() as client:
             data = {
                 "token": token,
@@ -126,6 +195,11 @@ class AuthService:
 
     @staticmethod
     async def logout(token: str):
+        """Завершение сессии пользователя.
+
+        :param token: Refresh token
+        :type token: str
+        """
         async with httpx.AsyncClient() as client:
             await client.post(
                 openid_config["logout_endpoint"],

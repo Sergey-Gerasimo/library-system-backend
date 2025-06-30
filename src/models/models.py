@@ -17,7 +17,7 @@ from uuid import UUID, uuid4
 
 from database import Base
 
-get_current_time = lambda: datetime.now(timezone.utc)
+get_current_time = lambda: datetime.now(timezone.utc).replace(tzinfo=None)
 idpk = Annotated[int, mapped_column(primary_key=True)]
 uuid = Annotated[UUID, mapped_column(default=uuid4, primary_key=True)]
 created_at = Annotated[datetime, mapped_column(default=get_current_time)]
@@ -66,11 +66,11 @@ class Book(Base):
 
     author: Mapped["Author"] = relationship(
         back_populates="books",
-        lazy="raise",
+        lazy="selectin",
     )
     genre: Mapped["Genre"] = relationship(
         back_populates="books",
-        lazy="raise",
+        lazy="selectin",
     )
     files: Mapped[List["BookFile"]] = relationship(
         back_populates="book", lazy="selectin", cascade="all, delete-orphan"

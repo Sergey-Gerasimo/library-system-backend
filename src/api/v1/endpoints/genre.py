@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends
 from uuid import UUID
 from typing import List
 
-from schemas import GenreCreate, GenreInDB, GenreUpdate, GenreWithBooks
+from schemas import GenreCreate, GenreInDB, GenreUpdate
 from api.dependencies import get_genre_service
-from services import GenreService
+from services.services import GenreService
 
 
 router = APIRouter(prefix="/genres", tags=["genres"])
@@ -15,7 +15,7 @@ async def get_all_genre(
     user_id: UUID,
     genre_service: GenreService = Depends(get_genre_service),
 ) -> List[GenreInDB]:
-    return await genre_service.get_all_genres()
+    return await genre_service.get_all()
 
 
 @router.get("/get")
@@ -24,7 +24,7 @@ async def get_genre(
     user_id: UUID,
     genre_service: GenreService = Depends(get_genre_service),
 ) -> GenreInDB:
-    return await genre_service.get_genre_by_id(genre_id=genre_id)
+    return await genre_service.get(id=genre_id)
 
 
 @router.put("/update")
@@ -34,9 +34,9 @@ async def update_genre(
     user_id: UUID,
     genre_service: GenreService = Depends(get_genre_service),
 ) -> GenreInDB:
-    genre = await genre_service.update_genre(
-        genre_id=genre_id,
-        genre_data=genre_data,
+    genre = await genre_service.update(
+        id=genre_id,
+        schema=genre_data,
     )
 
     return genre
@@ -48,10 +48,7 @@ async def create_genre(
     genre_data: GenreCreate,
     genre_service: GenreService = Depends(get_genre_service),
 ):
-    genre = await genre_service.create_genre(
-        genre_data=genre_data,
-    )
-
+    genre = await genre_service.create(schema=genre_data)
     return genre
 
 
@@ -61,6 +58,6 @@ async def delete_genre(
     genre_id: UUID,
     genre_service: GenreService = Depends(get_genre_service),
 ) -> GenreInDB:
-    genre = await genre_service.delete_genre(genre_id=genre_id)
+    genre = await genre_service.delete(id=genre_id)
 
     return genre

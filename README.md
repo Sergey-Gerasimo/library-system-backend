@@ -126,3 +126,7 @@ CLIENT_SECRET=""
 DOMAIN=""
 
 ```
+
+#### Способ документации
+
+**eStructuredText (Sphinx Style)**

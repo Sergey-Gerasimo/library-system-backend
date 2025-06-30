@@ -64,3 +64,11 @@ class AuthorInDB(AuthorBase):
 
     class Config:
         from_attributes = True  # Ранее называлось orm_mode=True в Pydantic v1
+
+
+class AuthorFilter(BaseModel):
+    """Простая модель фильтрации авторов"""
+
+    name: Optional[str] = None
+    bio_contains: Optional[str] = None
+    has_books: Optional[bool] = None

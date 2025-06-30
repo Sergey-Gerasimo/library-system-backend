@@ -32,6 +32,12 @@ class GenreInDB(GenreBase):
         from_attributes = True  # Ранее known as orm_mode
 
 
+class GenreFilter(BaseModel):
+    id: Optional[UUID] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
 class GenreWithBooks(GenreInDB):
     """Схема жанра с книгами"""
 

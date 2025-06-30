@@ -8,7 +8,7 @@ SQLAlchemy==2.0.41
 redis==6.2.0
 aioredis==2.0.1
 
-# S3 Storage (совместимые версии)
+# S3 Storage
 aiobotocore==2.5.0
 botocore==1.29.76
 aiohttp==3.9.5
@@ -34,6 +34,7 @@ defusedxml==0.7.1
 click==8.1.8
 envparse==0.2.0
 typing_extensions==4.14.0
+python-magic==0.4.27
 
 # Тестирование 
 pytest

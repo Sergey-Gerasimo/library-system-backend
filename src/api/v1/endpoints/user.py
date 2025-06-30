@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 
-from services.auth_service import AuthService
-from services.user_service import UserService
+from services.services import AuthService, UserService
 from schemas import User
 from api.dependencies import get_auth_service, get_user_service
 

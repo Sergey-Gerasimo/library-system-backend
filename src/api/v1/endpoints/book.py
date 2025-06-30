@@ -3,9 +3,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 
-from schemas import BookResponse, BookCreate, BookUpdate
-from api.dependencies import get_book_service, get_db
-from services import BookService
+from schemas import BookInDB, BookCreate, BookUpdate, File as UniversalFile
+from api.dependencies import get_book_service
+from services.services import BookService
 
 from typing import Annotated, Optional
 
@@ -19,14 +19,12 @@ async def create_book(
     pdf_file: UploadFile = File(...),
     cover: UploadFile = File(...),
     book_service: BookService = Depends(get_book_service),
-) -> BookResponse:
+) -> BookInDB:
 
-    book = await book_service.create_book(
-        cover_file=cover,
-        pdf_file=pdf_file,
-        book_data=book,
-        user_id=user_id,
-    )
+    pdf_file = await UniversalFile.from_uploadfile(pdf_file)
+    cover = await UniversalFile.from_uploadfile(cover)
+
+    book = await book_service.create(pdf=pdf_file, cover=cover, book=book)
 
     return book
 
@@ -35,8 +33,8 @@ async def create_book(
 async def get_book(
     book_id: UUID,
     book_service: BookService = Depends(get_book_service),
-) -> BookResponse:
-    book = await book_service.get_book(book_id=book_id)
+) -> BookInDB:
+    book = await book_service.get(id=book_id)
     return book
 
 
@@ -56,11 +54,15 @@ async def update_book(
         Optional[UploadFile], File(description="Новая обложка книги")
     ] = None,
     book_service: BookService = Depends(get_book_service),
-) -> BookResponse:
-    book = await book_service.update_book(
-        book_id=book_id,
-        book_data=book_data,
-        user_id=user_id,
+) -> BookInDB:
+    if new_pdf is not None:
+        new_pdf = await UniversalFile.from_uploadfile(new_pdf)
+
+    if new_cover is not None:
+        new_cover = await UniversalFile.from_uploadfile(new_cover)
+
+    book = await book_service.update(
+        id=book_id, pdf=new_pdf, cover=new_cover, book=book_data
     )
     return book
 
@@ -70,7 +72,7 @@ async def delete_book(
     book_id: UUID,
     user_id: UUID,
     book_service: BookService = Depends(get_book_service),
-) -> BookResponse:
+) -> BookInDB:
 
-    book = await book_service.delete_book(book_id=book_id, user_id=user_id)
+    book = await book_service.delete(id=book_id)
     return book

@@ -1,13 +1,21 @@
-from services import (
+from services.services import (
     GenreService,
     AuthorService,
     AuthService,
     BookService,
-    S3Client,
-    BookStorage,
     UserService,
 )
-from config import services_settings
+
+from services.crud import (
+    GenreCRUD,
+    AuthorCRUD,
+    UserCRUD,
+    BookCRUD,
+    BookFilesCRUD,
+    BookHistoryCRUD,
+    S3CRUD,
+)
+from config import services_settings, s3_settings
 
 from fastapi import Depends
 
@@ -46,30 +54,37 @@ async def get_auth_service() -> AsyncGenerator[AuthService, Any]:
     yield AuthService()
 
 
-async def get_book_service(
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-) -> AsyncGenerator[BookStorage, Any]:
-
-    book_storage = BookStorage(redis=redis)
-    yield BookService(db, book_storage)
-
-
-async def get_genre_service(
-    db: AsyncSession = Depends(get_db),
-) -> AsyncGenerator[GenreService, Any]:
-
-    yield GenreService(db)
-
-
 async def get_author_service(
     db: AsyncSession = Depends(get_db),
 ) -> AsyncGenerator[AuthorService, Any]:
-
-    yield AuthorService(db)
+    crud = AuthorCRUD(db_session=db)
+    yield AuthorService(crud=crud)
 
 
 async def get_user_service(
     db: AsyncSession = Depends(get_db),
 ) -> AsyncGenerator[UserService, Any]:
-    yield UserService()
+    crud = UserCRUD(db_session=db)
+    yield UserService(crud=crud)
+
+
+async def get_book_service(
+    db: AsyncSession = Depends(get_db),
+) -> AsyncGenerator[BookService, Any]:
+    crud = BookCRUD(db_session=db)
+    book_files_crud = BookFilesCRUD(db_session=db)
+    s3 = S3CRUD(
+        aws_access_key_id=s3_settings.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=s3_settings.AWS_SECRET_ACCESS_KEY,
+        region_name=s3_settings.S3_REGION_NAME,
+        bucket_name=s3_settings.S3_BUCKET_NAME,
+        endpoint_url=s3_settings.S3_ENDPOINT_URL,
+    )
+    yield BookService(book_crud=crud, book_files_crud=book_files_crud, s3=s3)
+
+
+async def get_genre_service(
+    db: AsyncSession = Depends(get_db),
+) -> AsyncGenerator[GenreService, Any]:
+    crud = GenreCRUD(db_session=db)
+    yield GenreService(crud=crud)

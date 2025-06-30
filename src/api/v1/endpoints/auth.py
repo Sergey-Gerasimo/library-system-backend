@@ -9,14 +9,11 @@ from datetime import timedelta
 from config.keycloak import openid_config, client_config, keycloak_settings
 from config.settings import app_settings
 
-from services.auth_service import AuthService
+from services.services import AuthService
 from schemas import Token
 from api.dependencies import get_auth_service, get_user_service, get_redis
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-state_store = {}
-session_store = {}
 
 
 @router.post("/token")

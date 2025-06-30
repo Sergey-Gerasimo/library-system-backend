@@ -4,7 +4,7 @@ from typing import List
 
 from schemas import AuthorCreate, AuthorInDB, AuthorUpdate
 from api.dependencies import get_author_service
-from services import AuthorService
+from services.services import AuthorService
 
 from typing import Annotated
 
@@ -18,7 +18,7 @@ async def get_auther(
     author_service: AuthorService = Depends(get_author_service),
 ) -> AuthorInDB:
 
-    author = await author_service.get_author_by_id(author_id=author_id)
+    author = await author_service.get(id=author_id)
     return author
 
 
@@ -27,7 +27,7 @@ async def get_all_authors(
     user_id: UUID,
     author_service: AuthorService = Depends(get_author_service),
 ) -> List[AuthorInDB]:
-    authors = await author_service.get_all_authors()
+    authors = await author_service.get_all()
 
     return authors
 
@@ -40,9 +40,7 @@ async def update_author(
     author_service: AuthorService = Depends(get_author_service),
 ) -> AuthorInDB:
 
-    author = await author_service.update_author(
-        author_id=author_id, author_data=author_data
-    )
+    author = await author_service.update(id=author_id, schema=author_data)
 
     return author
 
@@ -53,8 +51,8 @@ async def add_author(
     user_id: UUID,
     author_service: AuthorService = Depends(get_author_service),
 ) -> AuthorInDB:
-    author = await author_service.create_author(author_data=author_data)
 
+    author = await author_service.create(schema=author_data)
     return author
 
 
@@ -63,7 +61,5 @@ async def delete_author(
     author_id: UUID,
     user_id: UUID,
     author_service: AuthorService = Depends(get_author_service),
-) -> AuthorInDB:
-
-    author = await author_service.delete_author(author_id=author_id)
-    return author
+):
+    await author_service.delete(id=author_id)
