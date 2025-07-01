@@ -21,3 +21,5 @@ class UserService:
                     detail="Invalid access token",
                 )
             return response.json()
+
+    # TODO: сделать методы CRUD и метод авторизации впервые

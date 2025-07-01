@@ -2,7 +2,9 @@ from contextlib import asynccontextmanager
 import aiobotocore
 from aiobotocore.client import AioBaseClient
 from typing import Optional, Union, BinaryIO, AsyncIterator, Any, Protocol
+import aiobotocore.client
 import aiobotocore.session
+from schemas import File
 
 
 class IStorageRUD(Protocol):
@@ -13,7 +15,7 @@ class IStorageRUD(Protocol):
     хранилища или других облачных провайдеров).
     """
 
-    async def download_file(self, file_key: str, **kwargs) -> bytes:
+    async def download_file(self, file_key: str, **kwargs) -> File:
         """Скачивает файл из хранилища."""
         ...
 
@@ -58,6 +60,9 @@ class IStorageRUD(Protocol):
     ) -> bool:
         """Обновляет метаданные файла."""
         ...
+
+
+# NOTE: Возможно надо сделать рефаторинг(Перейти от параметров к структурам)
 
 
 class S3CRUD:
@@ -212,7 +217,7 @@ class S3CRUD:
     async def download_file(
         self,
         file_key: str,
-    ) -> bytes:
+    ) -> File:
         """Скачивает файл из S3 хранилища.
 
         Возвращает содержимое файла в виде байтов. Для больших файлов
@@ -220,8 +225,8 @@ class S3CRUD:
 
         :param file_key: Ключ файла в S3
         :type file_key: str
-        :return: Содержимое файла
-        :rtype: bytes
+        :return: файл
+        :rtype: File
         :raises FileNotFoundError: Если файл не найден в бакете
         :raises aiobotocore.exceptions.ClientError: При других ошибках:
             - AccessDenied: Нет прав на чтение
@@ -232,9 +237,25 @@ class S3CRUD:
                 response = await client.get_object(
                     Bucket=self._bucket_name, Key=file_key
                 )
+
+                content_type = response.get("ContentType")
+                content_length = response.get("ContentLength", 0)
+                metadata = response.get("Metadata", {})
+
                 async with response["Body"] as stream:
                     data = await stream.read()
-                    return data
+
+                    return File(
+                        filename=file_key.split("/")[-1],
+                        content_type=content_type,
+                        headers={
+                            **metadata,
+                            "Content-Length": str(content_length),
+                            "Content-Type": content_type,
+                        },
+                        content=data,
+                        size=content_length,
+                    )
 
             except client.exceptions.NoSuchKey:
                 raise FileNotFoundError(

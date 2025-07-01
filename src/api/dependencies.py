@@ -4,6 +4,7 @@ from services.services import (
     AuthService,
     BookService,
     UserService,
+    StorageService,
 )
 
 from services.crud import (
@@ -45,6 +46,18 @@ async def get_redis() -> AsyncGenerator[Redis, Any]:
         await redis.close()
 
 
+async def get_s3_crud() -> AsyncGenerator[S3CRUD, Any]:
+    s3 = S3CRUD(
+        aws_access_key_id=s3_settings.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=s3_settings.AWS_SECRET_ACCESS_KEY,
+        region_name=s3_settings.S3_REGION_NAME,
+        bucket_name=s3_settings.S3_BUCKET_NAME,
+        endpoint_url=s3_settings.S3_ENDPOINT_URL,
+    )
+
+    yield s3
+
+
 async def get_db() -> AsyncGenerator[AsyncSession, Any]:
     async with AsyncSessionLocal() as session:
         yield session
@@ -70,16 +83,10 @@ async def get_user_service(
 
 async def get_book_service(
     db: AsyncSession = Depends(get_db),
+    s3: S3CRUD = Depends(get_s3_crud),
 ) -> AsyncGenerator[BookService, Any]:
     crud = BookCRUD(db_session=db)
     book_files_crud = BookFilesCRUD(db_session=db)
-    s3 = S3CRUD(
-        aws_access_key_id=s3_settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=s3_settings.AWS_SECRET_ACCESS_KEY,
-        region_name=s3_settings.S3_REGION_NAME,
-        bucket_name=s3_settings.S3_BUCKET_NAME,
-        endpoint_url=s3_settings.S3_ENDPOINT_URL,
-    )
     yield BookService(book_crud=crud, book_files_crud=book_files_crud, s3=s3)
 
 
@@ -88,3 +95,15 @@ async def get_genre_service(
 ) -> AsyncGenerator[GenreService, Any]:
     crud = GenreCRUD(db_session=db)
     yield GenreService(crud=crud)
+
+
+async def get_storage_service(
+    db: AsyncSession = Depends(get_db),
+    s3: S3CRUD = Depends(get_s3_crud),
+) -> AsyncGenerator[StorageService, Any]:
+    book_file_crud = BookFilesCRUD(db_session=db)
+
+    yield StorageService(
+        storage_crud=s3,
+        book_files_crud=book_file_crud,
+    )

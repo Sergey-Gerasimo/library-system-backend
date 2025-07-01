@@ -13,6 +13,10 @@ from schemas import (
     File,
 )
 
+# BUG: Строки в метаданных дожны быть в формате ASCII. Вылетает ошибки если не так
+# TODO: Добавить проверку на ASCII
+# TODO: Добвить ошибки
+
 
 class BookService:
     """Сервис для работы с книгами и связанными файлами.
@@ -152,6 +156,7 @@ class BookService:
         :rtype: Responce
         :raises ValueError: Если не переданы обязательные параметры
         """
+
         if book is None:
             if None in (title, year, author_id, genre_id):
                 raise ValueError("Missing required book fields")
