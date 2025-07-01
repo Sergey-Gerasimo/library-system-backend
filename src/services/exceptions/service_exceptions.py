@@ -6,6 +6,14 @@ from services.exceptions.crud_exceptions import (
     CRUDOperationError,
     CRUDRetryableError,
 )
+from services.exceptions.storage_exeptions import (
+    StorageAccessDeniedError,
+    StorageConnectionError,
+    StorageInternalError,
+    StorageInvalidStateError,
+    StorageNotFoundError,
+    StorageOperationError,
+)
 
 from functools import wraps
 from typing import Callable, TypeVar, Any, Coroutine, ParamSpec
@@ -50,6 +58,72 @@ class ServiceTemporaryError(ServiceError):
 
 P = ParamSpec("P")  # Параметры оригинальной функции
 R = TypeVar("R")  # Возвращаемый тип
+
+
+def handle_storage_service_errors(
+    max_retries: int = 1, retry_delay: float = 0.1
+) -> Callable[
+    [Callable[P, Coroutine[Any, Any, R]]], Callable[P, Coroutine[Any, Any, R]]
+]:
+    """Декоратор для обработки и трансформации ошибок хранилища в сервисном слое.
+
+    Обеспечивает:
+    - Преобразование ошибок хранилища в стандартные сервисные исключения
+    - Автоматические повторные попытки для временных ошибок подключения
+    - Единообразную обработку ошибок на уровне сервиса
+    - Сохранение цепочки исключений (exception chaining)
+
+    Args:
+        max_retries: Максимальное количество повторных попыток при временных ошибках
+                    (default: 1)
+        retry_delay: Базовая задержка между попытками в секундах (default: 0.1)
+                    Реальная задержка рассчитывается как retry_delay * attempt_number
+
+    Returns:
+        Декорированную асинхронную функцию с обработкой ошибок хранилища
+
+    Raises:
+        ServiceNotFoundError: При отсутствии запрашиваемых данных в хранилище
+        ServiceValidationError: При ошибках доступа/авторизации
+        ServiceIntegrityError: При недопустимом состоянии данных
+        ServiceTemporaryError: Для временных проблем с подключением к хранилищу
+        ServiceOperationError: Для прочих ошибок операций с хранилищем
+
+    Пример использования:
+        @handle_storage_service_errors(max_retries=2)
+        async def fetch_user_data(user_id: UUID) -> UserData:
+            ...
+    """
+
+    def decorator(
+        func: Callable[P, Coroutine[Any, Any, R]],
+    ) -> Callable[P, Coroutine[Any, Any, R]]:
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            try:
+                return await func(*args, **kwargs)
+
+            except StorageNotFoundError as e:
+                raise ServiceNotFoundError(str(e)) from e
+
+            except StorageAccessDeniedError as e:
+                raise ServiceValidationError(str(e)) from e
+
+            except StorageInvalidStateError as e:
+                raise ServiceIntegrityError(str(e)) from e
+
+            except (StorageInternalError, StorageOperationError) as e:
+                raise ServiceOperationError(str(e)) from e
+
+            except StorageConnectionError as e:
+                raise ServiceTemporaryError(str(e)) from e
+
+            except Exception as e:
+                raise ServiceOperationError(f"Неизвестная ошибка: {str(e)}") from e
+
+        return wrapper
+
+    return decorator
 
 
 def handle_service_errors(

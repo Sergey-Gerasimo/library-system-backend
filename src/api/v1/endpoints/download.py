@@ -10,9 +10,6 @@ from schemas import FileType
 
 router = APIRouter(prefix="/download", tags=["download"])
 
-# BUG: генерируется ссылка с чувствительными данными
-# TODO: Сделать безопасную ссылку и умный редирект
-
 
 @router.get("/book/{book_id}/pdf")
 async def download_book(

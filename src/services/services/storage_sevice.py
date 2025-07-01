@@ -13,9 +13,6 @@ from schemas import (
 )
 
 
-# TODO: реализовать методы StorageService
-
-
 class StorageService:
     def __init__(self, storage_crud: IStorageRUD, book_files_crud: IBookFilesCRUD):
         self._storage_crud = storage_crud
@@ -99,33 +96,4 @@ class StorageService:
         return link
 
     async def file_exists(self, file_key: str) -> bool:
-        raise NotImplementedError()
-
-    async def find_file_by_storage_key(self, storage_key: str) -> Optional["Responce"]:
-        raise NotImplementedError()
-
-    async def list_files(self, prefix: Optional[str] = None) -> List[str]:
-        raise NotImplementedError()
-
-    async def update_file_record(
-        self, file_id: UUID, update_data: "Update"
-    ) -> Optional["Responce"]:
-        raise NotImplementedError()
-
-    async def get_file_by_id(self, file_id: UUID) -> Optional["Responce"]:
-        raise NotImplementedError()
-
-    async def create_file_record(self, create_data: "Create") -> "Responce":
-        raise NotImplementedError()
-
-    async def exists_file_record(self, **kwargs: Any) -> bool:
-        raise NotImplementedError()
-
-    async def get_all_file_records(
-        self,
-        filter: Optional["Filter"] = None,
-        limit: int = 100,
-        offset: int = 0,
-        order_by: Optional[str] = None,
-    ) -> List["Responce"]:
-        raise NotImplementedError()
+        return await self._book_files_crud.exists(storage_key=file_key)

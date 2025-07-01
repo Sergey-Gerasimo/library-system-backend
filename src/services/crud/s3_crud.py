@@ -6,6 +6,8 @@ import aiobotocore.client
 import aiobotocore.session
 from schemas import File
 
+from services.exceptions import handle_storage_errors
+
 
 class IStorageRUD(Protocol):
     """Протокол для типизации хранилищ файлов с CRUD операциями.
@@ -84,6 +86,14 @@ class S3CRUD:
         - Генерация presigned URL для временного доступа
         - Полная типизация методов
         - Контекстные менеджеры для управления подключениями
+        - Единая обработка ошибок через декоратор @handle_s3_errors
+
+    Обрабатываемые ошибки:
+        - S3NotFoundError: файл или бакет не найдены
+        - S3AccessDeniedError: недостаточно прав для операции
+        - S3InvalidStateError: недопустимое состояние объекта
+        - S3ConnectionError: проблемы с подключением к хранилищу
+        - S3OperationError: прочие ошибки операций с S3
 
     Пример использования:
         s3 = S3CRUD(
@@ -156,20 +166,28 @@ class S3CRUD:
         return self._bucket_name
 
     @asynccontextmanager
+    @handle_storage_errors()
     async def _get_client(self) -> AsyncIterator[AioBaseClient]:
         """Контекстный менеджер для получения клиента S3.
 
         Создает и управляет жизненным циклом асинхронного клиента S3.
         Автоматически закрывает соединение при выходе из контекста.
+        Ошибки обрабатываются декоратором @handle_s3_errors.
 
         :yield: Асинхронный клиент S3
         :rtype: AsyncIterator[AioBaseClient]
-        :raises aiobotocore.exceptions.ClientError: При ошибках подключения
+        :raises S3NotFoundError: Когда файл или бакет не найдены
+        :raises S3AccessDeniedError: При проблемах с авторизацией
+        :raises S3InvalidStateError: При проблемах с состоянием объекта
+        :raises S3InternalError: При внутренних ошибках S3
+        :raises S3ConnectionError: При проблемах с подключением
+        :raises S3OperationError: При других ошибках операций с S3
         """
 
         async with self.session.create_client("s3", **self._config) as client:
             yield client
 
+    @handle_storage_errors()
     async def upload_file(
         self,
         file_key: str,
@@ -192,10 +210,11 @@ class S3CRUD:
         :type metadata: Optional[dict]
         :return: True при успешной загрузке
         :rtype: bool
-        :raises aiobotocore.exceptions.ClientError: При ошибках загрузки:
-            - NoSuchBucket: Бакет не существует
-            - AccessDenied: Нет прав на запись
-            - InvalidObjectState: Проблемы с состоянием объекта
+        :raises S3NotFoundError: Если бакет не существует
+        :raises S3AccessDeniedError: При отсутствии прав на запись
+        :raises S3InvalidStateError: При проблемах с состоянием объекта
+        :raises S3ConnectionError: При проблемах с подключением
+        :raises S3OperationError: При прочих ошибках загрузки
         """
 
         async with self._get_client() as client:
@@ -214,6 +233,7 @@ class S3CRUD:
             await client.put_object(**put_params)
             return True
 
+    @handle_storage_errors()
     async def download_file(
         self,
         file_key: str,
@@ -227,10 +247,11 @@ class S3CRUD:
         :type file_key: str
         :return: файл
         :rtype: File
-        :raises FileNotFoundError: Если файл не найден в бакете
-        :raises aiobotocore.exceptions.ClientError: При других ошибках:
-            - AccessDenied: Нет прав на чтение
-            - InvalidObjectState: Объект в Glacier и требует восстановления
+        :raises S3NotFoundError: Если файл не найден в бакете
+        :raises S3AccessDeniedError: При отсутствии прав на чтение
+        :raises S3InvalidStateError: Если объект в Glacier и требует восстановления
+        :raises S3ConnectionError: При проблемах с подключением
+        :raises S3OperationError: При прочих ошибках скачивания
         """
         async with self._get_client() as client:
             try:
@@ -262,6 +283,7 @@ class S3CRUD:
                     f"File {file_key} not found in bucket {self.bucket_name}"
                 )
 
+    @handle_storage_errors()
     async def get_file_metadata(self, file_key: str) -> dict:
         """Получает метаданные файла из S3.
 
@@ -275,8 +297,10 @@ class S3CRUD:
         :type file_key: str
         :return: Словарь с метаданными
         :rtype: dict
-        :raises FileNotFoundError: Если файл не найден
-        :raises aiobotocore.exceptions.ClientError: При ошибках доступа
+        :raises S3NotFoundError: Если файл не найден
+        :raises S3AccessDeniedError: При отсутствии прав на чтение метаданных
+        :raises S3ConnectionError: При проблемах с подключением
+        :raises S3OperationError: При прочих ошибках получения метаданных
         """
 
         async with self._get_client() as client:
@@ -295,6 +319,7 @@ class S3CRUD:
                     f"File {file_key} not found in bucket {self.bucket_name}"
                 )
 
+    @handle_storage_errors()
     async def update_file_metadata(
         self, file_key: str, metadata: dict, content_type: Optional[str] = None
     ) -> bool:
@@ -311,7 +336,10 @@ class S3CRUD:
         :type content_type: Optional[str]
         :return: True при успешном обновлении
         :rtype: bool
-        :raises aiobotocore.exceptions.ClientError: При ошибках копирования
+        :raises S3NotFoundError: Если файл не найден
+        :raises S3AccessDeniedError: При отсутствии прав на обновление
+        :raises S3ConnectionError: При проблемах с подключением
+        :raises S3OperationError: При прочих ошибках обновления
         """
 
         async with self._get_client() as client:
@@ -329,6 +357,7 @@ class S3CRUD:
             await client.copy_object(**copy_params)
             return True
 
+    @handle_storage_errors()
     async def delete_file(self, file_key: str) -> bool:
         """Удаляет файл из S3 хранилища.
 
@@ -336,15 +365,17 @@ class S3CRUD:
         :type file_key: str
         :return: True при успешном удалении
         :rtype: bool
-        :raises aiobotocore.exceptions.ClientError: При ошибках удаления:
-            - AccessDenied: Нет прав на удаление
-            - InternalError: Ошибка сервера S3
+        :raises S3NotFoundError: Если файл не найден
+        :raises S3AccessDeniedError: При отсутствии прав на удаление
+        :raises S3ConnectionError: При проблемах с подключением
+        :raises S3OperationError: При прочих ошибках удаления
         """
 
         async with self._get_client() as client:
             await client.delete_object(Bucket=self._bucket_name, Key=file_key)
             return True
 
+    @handle_storage_errors()
     async def list_files(self, prefix: Optional[str] = None) -> list:
         """Возвращает список файлов в бакете.
 
@@ -354,9 +385,10 @@ class S3CRUD:
         :type prefix: Optional[str]
         :return: Список ключей файлов
         :rtype: list
-        :raises aiobotocore.exceptions.ClientError: При ошибках запроса:
-            - NoSuchBucket: Бакет не существует
-            - AccessDenied: Нет прав на чтение
+        :raises S3NotFoundError: Если бакет не существует
+        :raises S3AccessDeniedError: При отсутствии прав на чтение списка
+        :raises S3ConnectionError: При проблемах с подключением
+        :raises S3OperationError: При прочих ошибках запроса
         """
 
         async with self._get_client() as client:
@@ -367,6 +399,7 @@ class S3CRUD:
             response = await client.list_objects_v2(**list_params)
             return [obj["Key"] for obj in response.get("Contents", [])]
 
+    @handle_storage_errors()
     async def generate_presigned_url(
         self,
         file_key: str,
@@ -386,7 +419,10 @@ class S3CRUD:
         :type download_filename: Optional[str]
         :return: Сгенерированная URL-ссылка
         :rtype: str
-        :raises aiobotocore.exceptions.ClientError: При ошибках генерации
+        :raises S3NotFoundError: Если файл не найден
+        :raises S3AccessDeniedError: При отсутствии прав на генерацию ссылки
+        :raises S3ConnectionError: При проблемах с подключением
+        :raises S3OperationError: При прочих ошибках генерации
         """
 
         async with self._get_client() as client:

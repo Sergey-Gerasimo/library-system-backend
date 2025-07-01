@@ -16,12 +16,25 @@ from .service_exceptions import (
     ServiceTemporaryError,
     ServiceValidationError,
     handle_service_errors,
+    handle_storage_service_errors,
+)
+
+from .storage_exeptions import (
+    StorageOperationError,
+    StorageAccessDeniedError,
+    StorageConnectionError,
+    StorageInternalError,
+    StorageInvalidStateError,
+    StorageNotFoundError,
+    handle_storage_errors,
 )
 
 __all__ = [
     # Декораторы
     "handle_db_errors",
     "handle_service_errors",
+    "handle_storage_errors",
+    "handle_storage_service_errors",
     # Ошибки CRUD
     "CRUDOperationError",
     "CRUDNotFoundError",
@@ -36,4 +49,11 @@ __all__ = [
     "ServiceOperationError",
     "ServiceTemporaryError",
     "ServiceValidationError",
+    # ошибки Storage
+    "StorageOperationError",
+    "StorageAccessDeniedError",
+    "StorageConnectionError",
+    "StorageInternalError",
+    "StorageInvalidStateError",
+    "StorageNotFoundError",
 ]

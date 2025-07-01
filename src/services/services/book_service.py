@@ -1,8 +1,22 @@
 from typing import override, Optional, List
 from uuid import UUID
 import magic
+import asyncio
 
 from services.crud import IBookCRUD, IBookFilesCRUD, IStorageRUD
+from services.exceptions import (
+    handle_service_errors,
+    handle_storage_service_errors,
+    ServiceError,
+    ServiceIntegrityError,
+    ServiceNotFoundError,
+    ServiceOperationError,
+    ServiceTemporaryError,
+    ServiceValidationError,
+)
+
+from utils import translit_dict
+
 from schemas import (
     BookCreate as Create,
     BookFilter as Filter,
@@ -13,10 +27,6 @@ from schemas import (
     File,
 )
 
-# BUG: Строки в метаданных дожны быть в формате ASCII. Вылетает ошибки если не так
-# TODO: Добавить проверку на ASCII
-# TODO: Добвить ошибки
-
 
 class BookService:
     """Сервис для работы с книгами и связанными файлами.
@@ -26,6 +36,8 @@ class BookService:
     - Управление файлами в S3 хранилище
     - Базовые CRUD операции для книг
     - Связь между книгами и их файлами
+    - Валидацию MIME-типов загружаемых файлов
+    - Обработку и трансформацию ошибок хранилища и БД
 
     :ivar _book_crud: CRUD слой для работы с книгами
     :vartype _book_crud: IBookCRUD
@@ -33,6 +45,11 @@ class BookService:
     :vartype _book_files_crud: IBookFilesCRUD
     :ivar _s3: Клиент для работы с S3 хранилищем
     :vartype _s3: IStorageRUD
+
+    :raises ServiceValidationError: При невалидных данных или файлах
+    :raises ServiceNotFoundError: При отсутствии запрашиваемых данных
+    :raises ServiceOperationError: При ошибках операций с хранилищем
+    :raises ServiceTemporaryError: При временных проблемах с хранилищем
     """
 
     def __init__(
@@ -61,9 +78,14 @@ class BookService:
         :type file_bytes: bytes
         :return: MIME-тип файла
         :rtype: str
+        :raises ServiceValidationError: Если не удалось определить MIME-тип
         """
-        mime = magic.Magic(mime=True)
-        return mime.from_buffer(file_bytes)
+        try:
+            mime = magic.Magic(mime=True)
+            return mime.from_buffer(file_bytes)
+
+        except Exception as e:
+            raise ServiceValidationError(f"Invalid file content: {str(e)}") from e
 
     async def _upload_file(
         self, book_id: UUID, s3_key, file: File, file_type: FileType
@@ -80,31 +102,41 @@ class BookService:
         :type file_type: FileType
         :return: Ключ загруженного файла в S3
         :rtype: str
-        :raises Exception: При ошибке загрузки в S3
+        :raises ServiceValidationError: При невалидных метаданных или типе файла
+        :raises ServiceOperationError: При ошибке загрузки в S3
         """
+        try:
+            content_type = self.__get_mime_type(file.content)
 
-        content_type = self.__get_mime_type(file.content)
+            for key, value in file.headers.items():
+                if not all(ord(char) < 128 for char in f"{key}{value}"):
+                    raise ServiceValidationError(
+                        "Metadata keys and values must be ASCII only"
+                    )
 
-        if not await self._s3.upload_file(
-            file_key=s3_key,
-            file_data=file.content,
-            content_type=content_type,
-            metadata=file.headers,
-        ):
-            raise Exception("Failed to upload file to S3")
+            if not await self._s3.upload_file(
+                file_key=s3_key,
+                file_data=file.content,
+                content_type=content_type,
+                metadata=translit_dict(file.headers),
+            ):
+                raise ServiceOperationError("Failed to upload file to S3")
 
-        await self._book_files_crud.create(
-            BookFileCreate(
-                book_id=book_id,
-                storage_key=s3_key,
-                file_type=file_type,
-                original_name=file.filename,
-                size_bytes=file.size,
-                mime_type=content_type,
+            await self._book_files_crud.create(
+                BookFileCreate(
+                    book_id=book_id,
+                    storage_key=s3_key,
+                    file_type=file_type,
+                    original_name=file.filename,
+                    size_bytes=file.size,
+                    mime_type=content_type,
+                )
             )
-        )
-
-        return s3_key
+            return s3_key
+        except ServiceValidationError:
+            raise
+        except Exception as e:
+            raise ServiceOperationError(f"File upload failed: {str(e)}") from e
 
     def _create_s3_key(self, book_id: UUID, file_name) -> str:
         """Сгенерировать ключ для хранения файла в S3.
@@ -118,7 +150,8 @@ class BookService:
         """
         return f"{book_id}/{file_name}"
 
-    @override
+    @handle_service_errors()
+    @handle_storage_service_errors()
     async def create(
         self,
         pdf: File,
@@ -154,43 +187,58 @@ class BookService:
         :type description: Optional[str]
         :return: Созданная книга
         :rtype: Responce
-        :raises ValueError: Если не переданы обязательные параметры
+        :raises ServiceValidationError: Если не переданы обязательные параметры
+        :raises ServiceIntegrityError: При нарушении целостности данных
+        :raises ServiceOperationError: При ошибках загрузки файлов
         """
+        try:
+            if book is None:
+                if None in (title, year, author_id, genre_id):
+                    raise ValueError("Missing required book fields")
 
-        if book is None:
-            if None in (title, year, author_id, genre_id):
-                raise ValueError("Missing required book fields")
+                book = Create(
+                    title=title,
+                    year=year,
+                    author_id=author_id,
+                    genre_id=genre_id,
+                    is_published=is_published,
+                    description=description,
+                )
 
-            book = Create(
-                title=title,
-                year=year,
-                author_id=author_id,
-                genre_id=genre_id,
-                is_published=is_published,
-                description=description,
-            )
+            bookInDB = await self._book_crud.create(book)
 
-        bookInDB = await self._book_crud.create(book)
+            try:
+                s3_pdf_key = self._create_s3_key(bookInDB.id, file_name=pdf.filename)
+                s3_cover_key = self._create_s3_key(
+                    bookInDB.id, file_name=cover.filename
+                )
 
-        s3_pdf_key = self._create_s3_key(bookInDB.id, file_name=pdf.filename)
-        s3_cover_key = self._create_s3_key(bookInDB.id, file_name=cover.filename)
+                await self._upload_file(
+                    book_id=bookInDB.id,
+                    s3_key=s3_pdf_key,
+                    file=pdf,
+                    file_type=FileType.PDF,
+                )
 
-        await self._upload_file(
-            book_id=bookInDB.id,
-            s3_key=s3_pdf_key,
-            file=pdf,
-            file_type=FileType.PDF,
-        )
+                await self._upload_file(
+                    book_id=bookInDB.id,
+                    s3_key=s3_cover_key,
+                    file=cover,
+                    file_type=FileType.COVER,
+                )
+                return bookInDB
 
-        await self._upload_file(
-            book_id=bookInDB.id,
-            s3_key=s3_cover_key,
-            file=cover,
-            file_type=FileType.COVER,
-        )
+            except Exception as e:
+                await self._book_crud.delete(bookInDB.id)
+                raise
 
-        return bookInDB
+        except Exception as e:
+            if isinstance(e, ServiceValidationError):
+                raise
+            raise ServiceOperationError(f"Book creation failed: {str(e)}") from e
 
+    @handle_service_errors()
+    @handle_storage_service_errors()
     async def get(self, id: UUID) -> Responce:
         """Получить книгу по ID.
 
@@ -198,10 +246,22 @@ class BookService:
         :type id: UUID
         :return: Найденная книга
         :rtype: Responce
+        :raises ServiceNotFoundError: Если книга не найдена
+        :raises ServiceOperationError: При ошибках доступа к данным
         """
-        book = await self._book_crud.get_by_id(id=id)
-        return book
 
+        try:
+            book = await self._book_crud.get_by_id(id=id)
+            if not book:
+                raise ServiceNotFoundError(f"Book with id {id} not found")
+            return book
+        except Exception as e:
+            if isinstance(e, ServiceNotFoundError):
+                raise
+            raise ServiceOperationError(f"Failed to get book: {str(e)}") from e
+
+    @handle_service_errors()
+    @handle_storage_service_errors()
     async def get_all(
         self,
         filter: Filter,
@@ -221,13 +281,24 @@ class BookService:
         :type order_by: str | None
         :return: Список книг
         :rtype: List[Responce]
+        :raises ServiceValidationError: При невалидных параметрах запроса
+        :raises ServiceOperationError: При ошибках доступа к данным
         """
-        books = await self._book_crud.get_all(
-            filter=filter, limit=limit, offset=offset, order_by=order_by
-        )
+        try:
+            if limit < 1 or offset < 0:
+                raise ServiceValidationError("Invalid pagination parameters")
 
-        return books
+            books = await self._book_crud.get_all(
+                filter=filter, limit=limit, offset=offset, order_by=order_by
+            )
+            return books
+        except Exception as e:
+            if isinstance(e, ServiceValidationError):
+                raise
+            raise ServiceOperationError(f"Failed to get books: {str(e)}") from e
 
+    @handle_service_errors()
+    @handle_storage_service_errors()
     async def get_by_author(self, author_id: UUID) -> List[Responce]:
         """Получить книги по ID автора.
 
@@ -235,10 +306,23 @@ class BookService:
         :type author_id: UUID
         :return: Список книг автора
         :rtype: List[Responce]
+        :raises ServiceNotFoundError: Если автор не найден
+        :raises ServiceOperationError: При ошибках доступа к данным
         """
-        books = await self._book_crud.get_by_author(author_id=author_id)
-        return books
+        try:
+            books = await self._book_crud.get_by_author(author_id=author_id)
+            if not books:
+                raise ServiceNotFoundError(f"No books found for author {author_id}")
+            return books
+        except Exception as e:
+            if isinstance(e, ServiceNotFoundError):
+                raise
+            raise ServiceOperationError(
+                f"Failed to get author's books: {str(e)}"
+            ) from e
 
+    @handle_service_errors()
+    @handle_storage_service_errors()
     async def get_by_title(self, title: str) -> Responce:
         """Получить книгу по точному названию.
 
@@ -246,10 +330,25 @@ class BookService:
         :type title: str
         :return: Найденная книга
         :rtype: Responce
+        :raises ServiceNotFoundError: Если книга не найдена
+        :raises ServiceValidationError: При пустом названии
+        :raises ServiceOperationError: При ошибках доступа к данным
         """
-        books = await self._book_crud.get_by_title(title=title)
-        return books
+        try:
+            if not title:
+                raise ServiceValidationError("Title cannot be empty")
 
+            book = await self._book_crud.get_by_title(title=title)
+            if not book:
+                raise ServiceNotFoundError(f"Book '{title}' not found")
+            return book
+        except Exception as e:
+            if isinstance(e, (ServiceNotFoundError, ServiceValidationError)):
+                raise
+            raise ServiceOperationError(f"Failed to get book by title: {str(e)}") from e
+
+    @handle_service_errors()
+    @handle_storage_service_errors()
     async def update(
         self,
         id: UUID,
@@ -288,62 +387,101 @@ class BookService:
         :type description: Optional[str]
         :return: Обновленная книга
         :rtype: Responce
+        :raises ServiceNotFoundError: Если книга не найдена
+        :raises ServiceValidationError: При невалидных данных
+        :raises ServiceOperationError: При ошибках обновления
         """
+        try:
+            existing_book = await self.get(id)
 
-        if book is None:
-            book = Update(
-                title=title,
-                year=year,
-                author_id=author_id,
-                genre_id=genre_id,
-                is_published=is_published,
-                description=description,
-            )
+            if book is None:
+                book = Update(
+                    title=title,
+                    year=year,
+                    author_id=author_id,
+                    genre_id=genre_id,
+                    is_published=is_published,
+                    description=description,
+                )
 
-        await self._book_crud.update(id=id, update_data=book)
+            updated_book = await self._book_crud.update(id=id, update_data=book)
 
-        if pdf is not None:
-            s3_pdf_key = self._create_s3_key(id, file_name=pdf.filename)
-            await self._upload_file(
-                book_id=id,
-                s3_key=s3_pdf_key,
-                file=pdf,
-                file_type=FileType.PDF,
-            )
+            # Обновляем файлы, если они предоставлены
+            upload_tasks = []
+            if pdf is not None:
+                s3_pdf_key = self._create_s3_key(id, file_name=pdf.filename)
+                upload_tasks.append(
+                    self._upload_file(
+                        book_id=id,
+                        s3_key=s3_pdf_key,
+                        file=pdf,
+                        file_type=FileType.PDF,
+                    )
+                )
 
-        if cover is not None:
-            s3_cover_key = self._create_s3_key(id, file_name=cover.filename)
+            if cover is not None:
+                s3_cover_key = self._create_s3_key(id, file_name=cover.filename)
+                upload_tasks.append(
+                    self._upload_file(
+                        book_id=id,
+                        s3_key=s3_cover_key,
+                        file=cover,
+                        file_type=FileType.COVER,
+                    )
+                )
 
-            await self._upload_file(
-                book_id=id,
-                s3_key=s3_cover_key,
-                file=cover,
-                file_type=FileType.COVER,
-            )
+            if upload_tasks:
+                await asyncio.gather(*upload_tasks)
 
+            return updated_book
+        except Exception as e:
+            if isinstance(e, (ServiceNotFoundError, ServiceValidationError)):
+                raise
+            raise ServiceOperationError(f"Failed to update book: {str(e)}") from e
+
+    @handle_service_errors()
+    @handle_storage_service_errors()
     async def exists(self, **kwargs) -> bool:
         """Проверить существование книги по параметрам.
 
         :param kwargs: Параметры для поиска
         :return: Флаг существования
         :rtype: bool
+        :raises ServiceValidationError: При невалидных параметрах поиска
+        :raises ServiceOperationError: При ошибках проверки
         """
-        return await self._crud.exists(**kwargs)
+        try:
+            if not kwargs:
+                raise ServiceValidationError("At least one search parameter required")
+            return await self._book_crud.exists(**kwargs)
+        except Exception as e:
+            if isinstance(e, ServiceValidationError):
+                raise
+            raise ServiceOperationError(f"Existence check failed: {str(e)}") from e
 
+    @handle_service_errors()
+    @handle_storage_service_errors()
     async def delete(self, id: UUID):
         """Удалить книгу и все связанные файлы.
 
         :param id: ID книги
         :type id: UUID
-        :raises Exception: Если книга не найдена
+        :raises ServiceNotFoundError: Если книга не найдена
+        :raises ServiceOperationError: При ошибках удаления
         """
-        book = await self._book_crud.get_by_id(id)
-        if book is None:
-            raise
+        try:
+            book = await self.get(id)
+            if not book:
+                raise ServiceNotFoundError(f"Book with id {id} not found")
 
-        files = await self._book_files_crud.get_by_book(book.id)
-        for file in files:
-            await self._s3.delete_file(file.storage_key)
-            await self._book_files_crud.delete(file.id)
+            files = await self._book_files_crud.get_by_book(book.id)
+            delete_tasks = [self._s3.delete_file(file.storage_key) for file in files]
+            delete_tasks.extend(self._book_files_crud.delete(file.id) for file in files)
 
-        await self._book_crud.delete(book.id)
+            await asyncio.gather(*delete_tasks)
+            await self._book_crud.delete(book.id)
+
+        except Exception as e:
+            if isinstance(e, ServiceNotFoundError):
+                raise
+            raise ServiceOperationError(f"Failed to delete book: {str(e)}") from e
