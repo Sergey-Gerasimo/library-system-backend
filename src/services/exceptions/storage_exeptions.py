@@ -3,9 +3,12 @@ from typing import Callable, Coroutine, TypeVar, Any, ParamSpec
 import asyncio
 from aiobotocore.client import AioBaseClient
 from botocore.exceptions import ClientError
+from loguru import logger
 
 P = ParamSpec("P")
 R = TypeVar("R")
+
+# TODO: нормально так заняться логированием
 
 
 class StorageOperationError(Exception):

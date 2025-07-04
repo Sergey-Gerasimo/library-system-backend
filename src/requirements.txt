@@ -40,3 +40,6 @@ python-magic==0.4.27
 pytest
 pytest-asyncio
 pytest-cov
+
+# логирование 
+loguru==0.7.3

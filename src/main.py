@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
+from loguru import logger
 
 from api.v1.routers import api_router
 from config import app_settings
-
+from logging_conf import setup_logging
+from middleware.logging import logging_middleware
 from database import create_tables, async_engine
 
 
@@ -17,6 +19,9 @@ async def lifespan(app: FastAPI):
     yield
 
 
+setup_logging()
+
+
 app = FastAPI(
     title=app_settings.APP_NAME,
     version=app_settings.APP_VERSION,
@@ -24,12 +29,14 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
     lifespan=lifespan,
 )
+app.middleware("http")(logging_middleware)
 
 app.include_router(api_router, prefix="/api")
 
 if __name__ == "__main__":
     import uvicorn
 
+    logger.success("Application started successfully")
     uvicorn.run(
         app,
         host=app_settings.APP_HOST,

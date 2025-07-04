@@ -2,6 +2,7 @@ from typing import override, Optional, List
 from uuid import UUID
 import magic
 import asyncio
+from loguru import logger
 
 from services.crud import IBookCRUD, IBookFilesCRUD, IStorageRUD
 from services.exceptions import (
@@ -70,6 +71,7 @@ class BookService:
         self._book_crud = book_crud
         self._book_files_crud = book_files_crud
         self._s3 = s3
+        self._logger = logger.bind(service="BookService", domain="books")
 
     def __get_mime_type(self, file_bytes: bytes) -> str:
         """Определить MIME-тип файла по его содержимому.
@@ -82,9 +84,21 @@ class BookService:
         """
         try:
             mime = magic.Magic(mime=True)
-            return mime.from_buffer(file_bytes)
+            mime_type = mime.from_buffer(file_bytes)
+            self._logger.debug(
+                "MIME type determined",
+                content_length=len(file_bytes),
+                detected_type=mime_type,
+            )
+
+            return mime_type
 
         except Exception as e:
+            self._logger.error(
+                "Failed to detect MIME type",
+                error=str(e),
+                content_length=len(file_bytes),
+            )
             raise ServiceValidationError(f"Invalid file content: {str(e)}") from e
 
     async def _upload_file(
@@ -105,21 +119,39 @@ class BookService:
         :raises ServiceValidationError: При невалидных метаданных или типе файла
         :raises ServiceOperationError: При ошибке загрузки в S3
         """
+
+        log_context = {
+            "book_id": str(book_id),
+            "s3_key": s3_key,
+            "file_type": file_type.value,
+            "file_name": file.filename,
+            "file_size": file.size,
+        }
+
+        self._logger.info("Starting file upload", **log_context)
         try:
+
             content_type = self.__get_mime_type(file.content)
+            log_context["content_type"] = content_type
 
             for key, value in file.headers.items():
                 if not all(ord(char) < 128 for char in f"{key}{value}"):
+                    self._logger.warning(
+                        "Non-ASCII metadata detected", **log_context, metadata_key=key
+                    )
                     raise ServiceValidationError(
                         "Metadata keys and values must be ASCII only"
                     )
 
-            if not await self._s3.upload_file(
+            upload_result = await self._s3.upload_file(
                 file_key=s3_key,
                 file_data=file.content,
                 content_type=content_type,
                 metadata=translit_dict(file.headers),
-            ):
+            )
+
+            if upload_result:
+                self._logger.error("S3 upload failed", **log_context)
                 raise ServiceOperationError("Failed to upload file to S3")
 
             await self._book_files_crud.create(
@@ -132,10 +164,17 @@ class BookService:
                     mime_type=content_type,
                 )
             )
+            self._logger.success("File uploaded successfully", **log_context)
             return s3_key
         except ServiceValidationError:
             raise
         except Exception as e:
+            self._logger.error(
+                "File upload failed",
+                **log_context,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             raise ServiceOperationError(f"File upload failed: {str(e)}") from e
 
     def _create_s3_key(self, book_id: UUID, file_name) -> str:
@@ -191,9 +230,26 @@ class BookService:
         :raises ServiceIntegrityError: При нарушении целостности данных
         :raises ServiceOperationError: При ошибках загрузки файлов
         """
+
+        creation_context = {
+            "pdf_file": pdf.filename,
+            "pdf_size": pdf.size,
+            "cover_file": cover.filename,
+            "cover_size": cover.size,
+            "title": title,
+            "year": year,
+            "author_id": author_id,
+            "genre_id": genre_id,
+            "is_published": is_published,
+            "description": description,
+        }
+
+        self._logger.info("Starting book creation", **creation_context)
+
         try:
             if book is None:
                 if None in (title, year, author_id, genre_id):
+                    self._logger.error("Missing required fields", **creation_context)
                     raise ValueError("Missing required book fields")
 
                 book = Create(
@@ -206,6 +262,9 @@ class BookService:
                 )
 
             bookInDB = await self._book_crud.create(book)
+            creation_context["book_id"] = str(bookInDB.id)
+
+            self._logger.debug("Book record created", **creation_context)
 
             try:
                 s3_pdf_key = self._create_s3_key(bookInDB.id, file_name=pdf.filename)
@@ -213,26 +272,44 @@ class BookService:
                     bookInDB.id, file_name=cover.filename
                 )
 
-                await self._upload_file(
-                    book_id=bookInDB.id,
-                    s3_key=s3_pdf_key,
-                    file=pdf,
-                    file_type=FileType.PDF,
-                )
+                upload_tasks = [
+                    self._upload_file(
+                        book_id=bookInDB.id,
+                        s3_key=self._create_s3_key(bookInDB.id, pdf.filename),
+                        file=pdf,
+                        file_type=FileType.PDF,
+                    ),
+                    self._upload_file(
+                        book_id=bookInDB.id,
+                        s3_key=self._create_s3_key(bookInDB.id, cover.filename),
+                        file=cover,
+                        file_type=FileType.COVER,
+                    ),
+                ]
 
-                await self._upload_file(
-                    book_id=bookInDB.id,
-                    s3_key=s3_cover_key,
-                    file=cover,
-                    file_type=FileType.COVER,
-                )
+                await asyncio.gather(*upload_tasks)
+                self._logger.success("Book created successfully", **creation_context)
                 return bookInDB
 
-            except Exception as e:
+            except Exception as upload_error:
+                self._logger.error(
+                    "Rolling back book creation due to file upload failure",
+                    **creation_context,
+                    error=str(upload_error),
+                )
                 await self._book_crud.delete(bookInDB.id)
                 raise
 
         except Exception as e:
+            error_type = (
+                "validation" if isinstance(e, ServiceValidationError) else "operation"
+            )
+            self._logger.error(
+                f"Book creation failed ({error_type})",
+                **creation_context,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             if isinstance(e, ServiceValidationError):
                 raise
             raise ServiceOperationError(f"Book creation failed: {str(e)}") from e
@@ -391,8 +468,28 @@ class BookService:
         :raises ServiceValidationError: При невалидных данных
         :raises ServiceOperationError: При ошибках обновления
         """
+        update_context = {
+            "book_id": str(id),
+            "update_fields": {
+                "title": title,
+                "year": year,
+                "author_id": author_id,
+                "genre_id": genre_id,
+                "is_published": is_published,
+                "description": description,
+            },
+            "files_updated": {"pdf": pdf is not None, "cover": cover is not None},
+        }
+
+        self._logger.info("Starting book update", **update_context)
+
         try:
             existing_book = await self.get(id)
+            update_context["current_state"] = {
+                "title": existing_book.title,
+                "author_id": str(existing_book.author_id),
+                "status": "published" if existing_book.is_published else "unpublished",
+            }
 
             if book is None:
                 book = Update(
@@ -405,6 +502,11 @@ class BookService:
                 )
 
             updated_book = await self._book_crud.update(id=id, update_data=book)
+            update_context["new_state"] = {
+                "title": updated_book.title,
+                "author_id": str(updated_book.author_id),
+                "status": "published" if updated_book.is_published else "unpublished",
+            }
 
             # Обновляем файлы, если они предоставлены
             upload_tasks = []
@@ -432,12 +534,29 @@ class BookService:
 
             if upload_tasks:
                 await asyncio.gather(*upload_tasks)
+                self._logger.debug("Files updated successfully", **update_context)
 
+            self._logger.success("Book updated successfully", **update_context)
             return updated_book
+
         except Exception as e:
-            if isinstance(e, (ServiceNotFoundError, ServiceValidationError)):
-                raise
-            raise ServiceOperationError(f"Failed to update book: {str(e)}") from e
+            error_type = (
+                "not_found"
+                if isinstance(e, ServiceNotFoundError)
+                else (
+                    "validation"
+                    if isinstance(e, ServiceValidationError)
+                    else "operation"
+                )
+            )
+
+            self._logger.error(
+                f"Book update failed ({error_type})",
+                **update_context,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise
 
     @handle_service_errors()
     @handle_storage_service_errors()
@@ -469,19 +588,39 @@ class BookService:
         :raises ServiceNotFoundError: Если книга не найдена
         :raises ServiceOperationError: При ошибках удаления
         """
+        delete_context = {"book_id": str(id)}
+        self._logger.warning("Starting book deletion", **delete_context)
+
         try:
             book = await self.get(id)
+            delete_context.update(
+                {"title": book.title, "author_id": str(book.author_id)}
+            )
+
             if not book:
                 raise ServiceNotFoundError(f"Book with id {id} not found")
 
             files = await self._book_files_crud.get_by_book(book.id)
+            delete_context["file_count"] = len(files)
+
+            self._logger.debug("Deleting associated files", **delete_context)
+
             delete_tasks = [self._s3.delete_file(file.storage_key) for file in files]
             delete_tasks.extend(self._book_files_crud.delete(file.id) for file in files)
 
             await asyncio.gather(*delete_tasks)
             await self._book_crud.delete(book.id)
 
+            self._logger.warning("Book deleted successfully", **delete_context)
+
         except Exception as e:
-            if isinstance(e, ServiceNotFoundError):
-                raise
-            raise ServiceOperationError(f"Failed to delete book: {str(e)}") from e
+            error_type = (
+                "not_found" if isinstance(e, ServiceNotFoundError) else "operation"
+            )
+            self._logger.error(
+                f"Book deletion failed ({error_type})",
+                **delete_context,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise

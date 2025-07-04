@@ -14,10 +14,13 @@ from services.exceptions.storage_exeptions import (
     StorageNotFoundError,
     StorageOperationError,
 )
-
+from loguru import logger
 from functools import wraps
 from typing import Callable, TypeVar, Any, Coroutine, ParamSpec
 import asyncio
+
+
+# TODO: нормально так заняться логированием
 
 
 class ServiceError(Exception):
@@ -61,7 +64,7 @@ R = TypeVar("R")  # Возвращаемый тип
 
 
 def handle_storage_service_errors(
-    max_retries: int = 1, retry_delay: float = 0.1
+    max_retries: int = 1, retry_delay: float = 0.1, log_errors: bool = True
 ) -> Callable[
     [Callable[P, Coroutine[Any, Any, R]]], Callable[P, Coroutine[Any, Any, R]]
 ]:
@@ -98,28 +101,104 @@ def handle_storage_service_errors(
     def decorator(
         func: Callable[P, Coroutine[Any, Any, R]],
     ) -> Callable[P, Coroutine[Any, Any, R]]:
+
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            try:
-                return await func(*args, **kwargs)
+            func_name = func.__name__
+            last_error = None
 
-            except StorageNotFoundError as e:
-                raise ServiceNotFoundError(str(e)) from e
+            for attempt in range(max_retries + 1):
+                try:
+                    if log_errors and attempt > 0:
+                        logger.warning(
+                            f"Retrying {func_name}, attempt {attempt + 1}/{max_retries + 1}",
+                            args=args,
+                            kwargs={
+                                k: v for k, v in kwargs.items() if k != "file"
+                            },  # Исключаем бинарные данные
+                            last_error=str(last_error) if last_error else None,
+                        )
 
-            except StorageAccessDeniedError as e:
-                raise ServiceValidationError(str(e)) from e
+                    result = await func(*args, **kwargs)
 
-            except StorageInvalidStateError as e:
-                raise ServiceIntegrityError(str(e)) from e
+                    if log_errors and attempt > 0:
+                        logger.success(
+                            f"Retry successful for {func_name} after {attempt} attempts"
+                        )
 
-            except (StorageInternalError, StorageOperationError) as e:
-                raise ServiceOperationError(str(e)) from e
+                    return result
 
-            except StorageConnectionError as e:
-                raise ServiceTemporaryError(str(e)) from e
+                except StorageNotFoundError as e:
+                    logger.error(
+                        f"Storage not found in {func_name}",
+                        error=str(e),
+                        args=args,
+                        kwargs={k: v for k, v in kwargs.items() if k != "file"},
+                    )
+                    raise ServiceNotFoundError(str(e)) from e
 
-            except Exception as e:
-                raise ServiceOperationError(f"Неизвестная ошибка: {str(e)}") from e
+                except StorageAccessDeniedError as e:
+                    logger.error(
+                        f"Access denied in {func_name}",
+                        error=str(e),
+                        args=args,
+                        kwargs={k: v for k, v in kwargs.items() if k != "file"},
+                    )
+                    raise ServiceValidationError(str(e)) from e
+
+                except StorageInvalidStateError as e:
+                    logger.error(
+                        f"Invalid state in {func_name}",
+                        error=str(e),
+                        args=args,
+                        kwargs={k: v for k, v in kwargs.items() if k != "file"},
+                    )
+                    raise ServiceIntegrityError(str(e)) from e
+
+                except (StorageInternalError, StorageOperationError) as e:
+                    logger.error(
+                        f"Operation failed in {func_name}",
+                        error=str(e),
+                        args=args,
+                        kwargs={k: v for k, v in kwargs.items() if k != "file"},
+                    )
+                    raise ServiceOperationError(str(e)) from e
+
+                except StorageConnectionError as e:
+                    last_error = e
+                    if attempt < max_retries:
+                        logger.warning(
+                            f"Temporary storage connection error in {func_name}, retrying...",
+                            attempt=attempt + 1,
+                            max_retries=max_retries,
+                            error=str(e),
+                        )
+                        await asyncio.sleep(retry_delay * (attempt + 1))
+                        continue
+
+                    logger.error(
+                        f"Storage connection failed after {max_retries + 1} attempts in {func_name}",
+                        error=str(e),
+                        args=args,
+                        kwargs={k: v for k, v in kwargs.items() if k != "file"},
+                    )
+                    raise ServiceTemporaryError(str(e)) from e
+
+                except Exception as e:
+                    logger.critical(
+                        f"Unexpected error in {func_name}",
+                        error=str(e),
+                        args=args,
+                        kwargs={k: v for k, v in kwargs.items() if k != "file"},
+                        exception_type=type(e).__name__,
+                    )
+                    raise ServiceOperationError(f"Unexpected error: {str(e)}") from e
+
+            raise (
+                last_error
+                if last_error
+                else ServiceOperationError("Unknown storage error")
+            )
 
         return wrapper
 
@@ -127,7 +206,7 @@ def handle_storage_service_errors(
 
 
 def handle_service_errors(
-    max_retries: int = 1, retry_delay: float = 0.1
+    max_retries: int = 1, retry_delay: float = 0.1, log_errors: bool = True
 ) -> Callable[
     [Callable[P, Coroutine[Any, Any, R]]], Callable[P, Coroutine[Any, Any, R]]
 ]:
@@ -163,33 +242,87 @@ def handle_service_errors(
     def decorator(
         func: Callable[P, Coroutine[Any, Any, R]],
     ) -> Callable[P, Coroutine[Any, Any, R]]:
+
         @wraps(func)
         async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            func_name = func.__name__
             last_error = None
 
             for attempt in range(max_retries + 1):
                 try:
-                    return await func(*args, **kwargs)
+                    if log_errors and attempt > 0:
+                        logger.warning(
+                            f"Retrying {func_name}, attempt {attempt + 1}/{max_retries + 1}",
+                            args=args,
+                            kwargs=kwargs,
+                            last_error=str(last_error) if last_error else None,
+                        )
+
+                    result = await func(*args, **kwargs)
+
+                    if log_errors and attempt > 0:
+                        logger.success(
+                            f"Retry successful for {func_name} after {attempt} attempts"
+                        )
+
+                    return result
 
                 except CRUDNotFoundError as e:
+                    logger.error(
+                        f"Resource not found in {func_name}",
+                        error=str(e),
+                        args=args,
+                        kwargs=kwargs,
+                    )
                     raise ServiceNotFoundError(str(e)) from e
 
                 except CRUDIntegrityError as e:
+                    logger.error(
+                        f"Data integrity error in {func_name}",
+                        error=str(e),
+                        args=args,
+                        kwargs=kwargs,
+                    )
                     raise ServiceIntegrityError(str(e)) from e
 
                 except (CRUDConnectionError, CRUDRetryableError) as e:
                     last_error = e
                     if attempt < max_retries:
+                        logger.warning(
+                            f"Temporary error in {func_name}, retrying...",
+                            attempt=attempt + 1,
+                            max_retries=max_retries,
+                            error=str(e),
+                        )
                         await asyncio.sleep(retry_delay * (attempt + 1))
                         continue
 
+                    logger.error(
+                        f"Operation failed after {max_retries + 1} attempts in {func_name}",
+                        error=str(e),
+                        args=args,
+                        kwargs=kwargs,
+                    )
                     raise ServiceTemporaryError(str(e)) from e
 
                 except CRUDOperationError as e:
+                    logger.error(
+                        f"Operation failed in {func_name}",
+                        error=str(e),
+                        args=args,
+                        kwargs=kwargs,
+                    )
                     raise ServiceOperationError(str(e)) from e
 
                 except Exception as e:
-                    raise ServiceError("Internal service error") from e
+                    logger.critical(
+                        f"Unexpected error in {func_name}",
+                        error=str(e),
+                        args=args,
+                        kwargs=kwargs,
+                        exception_type=type(e).__name__,
+                    )
+                    raise ServiceError(f"Internal service error: {str(e)}") from e
 
             raise last_error if last_error else ServiceError("Unknown service error")
 

@@ -166,7 +166,6 @@ class S3CRUD:
         return self._bucket_name
 
     @asynccontextmanager
-    @handle_storage_errors()
     async def _get_client(self) -> AsyncIterator[AioBaseClient]:
         """Контекстный менеджер для получения клиента S3.
 
@@ -176,12 +175,6 @@ class S3CRUD:
 
         :yield: Асинхронный клиент S3
         :rtype: AsyncIterator[AioBaseClient]
-        :raises S3NotFoundError: Когда файл или бакет не найдены
-        :raises S3AccessDeniedError: При проблемах с авторизацией
-        :raises S3InvalidStateError: При проблемах с состоянием объекта
-        :raises S3InternalError: При внутренних ошибках S3
-        :raises S3ConnectionError: При проблемах с подключением
-        :raises S3OperationError: При других ошибках операций с S3
         """
 
         async with self.session.create_client("s3", **self._config) as client:

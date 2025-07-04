@@ -3,6 +3,7 @@ from uuid import UUID
 from functools import wraps
 from typing import Callable, TypeVar, Generic, Type, Optional, List, Any
 from pydantic import BaseModel
+from loguru import logger
 
 from services.abc.Abstcract_CRUD import AbstractCRUD
 from services.exceptions import (
@@ -68,8 +69,11 @@ class AbstractService(
         :raises ServiceError: Если передан некорректный CRUD слой
         """
         if not isinstance(crud, AbstractCRUD):
+            logger.error("Invalid CRUD layer provided", crud_type=type(crud).__name__)
             raise ServiceError("Invalid CRUD layer provided")
+
         self._crud = crud
+        self._logger = logger.bind(service=self.__class__.__name__)
 
     @property
     def crud(self) -> CRUD:
@@ -92,11 +96,34 @@ class AbstractService(
         :raises ServiceIntegrityError: При нарушении целостности данных
         :raises ServiceError: При других ошибках операции
         """
+        log_context = {"operation": "create", "schema_type": type(schema).__name__}
+
+        self._logger.debug("Creating record", **log_context)
 
         try:
-            return await self._crud.create(schema)
+            result = await self._crud.create(schema)
+            self._logger.success(
+                "Record created", **log_context, record_id=getattr(result, "id", None)
+            )
+            return result
+
         except CRUDIntegrityError as e:
+            self._logger.error(
+                "Integrity error on create",
+                **log_context,
+                error=str(e),
+                error_type="integrity",
+            )
             raise ServiceIntegrityError(f"Create failed: {str(e)}") from e
+
+        except Exception as e:
+            self._logger.error(
+                "Create operation failed",
+                **log_context,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise ServiceError(f"Create failed: {str(e)}") from e
 
     @handle_service_errors()
     async def get(self, id: UUID) -> ResponseSchema:
@@ -110,13 +137,32 @@ class AbstractService(
         :raises ServiceError: При других ошибках операции
         """
 
+        log_context = {"operation": "get", "record_id": str(id)}
+        self._logger.debug("Fetching record", **log_context)
+
         try:
             result = await self._crud.get_by_id(id)
+
             if result is None:
+                self._logger.warning("Record not found", **log_context)
                 raise ServiceNotFoundError(f"Record {id} not found")
+
+            self._logger.debug("Record found", **log_context)
+
             return result
+
         except CRUDNotFoundError as e:
+            self._logger.warning("Record not found (CRUD)", **log_context, error=str(e))
             raise ServiceNotFoundError(str(e)) from e
+
+        except Exception as e:
+            self._logger.error(
+                "Get operation failed",
+                **log_context,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise ServiceError(f"Get failed: {str(e)}") from e
 
     @handle_service_errors(max_retries=3)
     async def update(self, id: UUID, schema: UpdateSchema) -> ResponseSchema:
@@ -132,15 +178,43 @@ class AbstractService(
         :raises ServiceIntegrityError: При нарушении целостности
         :raises ServiceError: При других ошибках операции
         """
+
+        log_context = {
+            "operation": "update",
+            "record_id": str(id),
+            "schema_type": type(schema).__name__,
+        }
+
+        self._logger.info("Updating record", **log_context)
+
         try:
             result = await self._crud.update(id, schema)
             if result is None:
+                self._logger.warning("Record not found for update", **log_context)
                 raise ServiceNotFoundError(f"Record {id} not found")
+
+            self._logger.success("Record updated", **log_context)
             return result
+
         except CRUDNotFoundError as e:
+            self._logger.warning("Record not found (CRUD)", **log_context, error=str(e))
             raise ServiceNotFoundError(str(e)) from e
         except CRUDIntegrityError as e:
+            self._logger.error(
+                "Integrity error on update",
+                **log_context,
+                error=str(e),
+                error_type="integrity",
+            )
             raise ServiceIntegrityError(f"Update failed: {str(e)}") from e
+        except Exception as e:
+            self._logger.error(
+                "Update operation failed",
+                **log_context,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise ServiceError(f"Update failed: {str(e)}") from e
 
     async def delete(self, id: UUID) -> bool:
         """Удаление записи с обработкой ошибок.
@@ -152,13 +226,31 @@ class AbstractService(
         :raises ServiceNotFoundError: Если запись не найдена
         :raises ServiceError: При других ошибках операции
         """
+        log_context = {"operation": "delete", "record_id": str(id)}
+
+        self._logger.warning("Deleting record", **log_context)
+
         try:
-            if not await self._crud.delete(id):
+            result = await self._crud.delete(id)
+            if not result:
+                self._logger.warning("Record not found for deletion", **log_context)
                 raise ServiceNotFoundError(f"Record {id} not found")
+
+            self._logger.success("Record deleted", **log_context)
             return True
 
         except CRUDNotFoundError as e:
+            self._logger.warning("Record not found (CRUD)", **log_context, error=str(e))
             raise ServiceNotFoundError(str(e)) from e
+
+        except Exception as e:
+            self._logger.error(
+                "Delete operation failed",
+                **log_context,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise ServiceError(f"Delete failed: {str(e)}") from e
 
     @handle_service_errors()
     async def exists(self, **kwargs) -> bool:
@@ -169,7 +261,23 @@ class AbstractService(
         :rtype: bool
         :raises ServiceError: При ошибках операции
         """
-        return await self._crud.exists(**kwargs)
+
+        log_context = {"operation": "exists", "filters": kwargs}
+
+        self._logger.debug("Checking record existence", **log_context)
+
+        try:
+            exists = await self._crud.exists(**kwargs)
+            self._logger.debug("Existence check result", **log_context, exists=exists)
+            return exists
+        except Exception as e:
+            self._logger.error(
+                "Existence check failed",
+                **log_context,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise ServiceError(f"Exists check failed: {str(e)}") from e
 
     @handle_service_errors()
     async def get_all(
@@ -195,12 +303,36 @@ class AbstractService(
         :raises ServiceError: При ошибках операции
         """
 
+        log_context = {
+            "operation": "get_all",
+            "limit": limit,
+            "offset": offset,
+            "order_by": order_by,
+            "has_filter": filter is not None,
+        }
+
+        self._logger.debug("Fetching records list", **log_context)
+
         if limit > 1000:
+            self._logger.error("Limit too large", **log_context, max_allowed=1000)
             raise ServiceValidationError("Максимальный лимит - 1000 записей")
 
         if offset < 0:
+            self._logger.error("Invalid offset", **log_context)
             raise ServiceValidationError("Смещение не может быть отрицательным")
 
-        return await self._crud.get_all(
-            filter=filter, limit=limit, offset=offset, order_by=order_by
-        )
+        try:
+            results = await self._crud.get_all(
+                filter=filter, limit=limit, offset=offset, order_by=order_by
+            )
+            self._logger.debug("Records fetched", **log_context, count=len(results))
+            return results
+
+        except Exception as e:
+            self._logger.error(
+                "Get all operation failed",
+                **log_context,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise ServiceError(f"Get all failed: {str(e)}") from e

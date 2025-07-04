@@ -7,6 +7,9 @@ services:
       - "${APP_PORT}:${APP_PORT}"
     env_file:
       - .env
+
+    volumes:
+      - ./logs_data/:/app/${LOG_FILE}
     depends_on:
       redis:
         condition: service_healthy

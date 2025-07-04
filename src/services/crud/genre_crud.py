@@ -1,4 +1,5 @@
-from typing import Protocol
+from typing import Protocol, Union
+from sqlalchemy import select, delete, update, and_
 
 from services.abc import AbstractCRUD, ICRUD
 
@@ -17,7 +18,7 @@ class IGenreCRUD(
 ):
     """Протокол для типизации CRUD операций с жанрами.
 
-    Наследует базовый интерфейс ICRUD без добавления специфичных методов.
+    Наследует базовый интерфейс ICRUD.
     Определяет стандартный контракт для работы с жанрами.
 
     Типы:
@@ -26,6 +27,11 @@ class IGenreCRUD(
         Update: GenreUpdate - схема обновления жанра
         Filter: GenreFilter - схема фильтрации жанров
     """
+
+    async def get_by_name(self, name: str) -> Union[Responce, None]: ...
+    async def search_in_description(
+        self, search_term: str
+    ) -> Union[Responce, None]: ...
 
 
 class GenreCRUD(AbstractCRUD["Model", "Create", "Update", "Filter", "Responce"]):
@@ -72,3 +78,24 @@ class GenreCRUD(AbstractCRUD["Model", "Create", "Update", "Filter", "Responce"])
         :rtype: type[GenreInDB]
         """
         return Responce
+
+    async def get_by_name(self, name: str) -> Union[Responce, None]:
+        """Возвращает Жанр по имени.
+
+        :return: Жанр если найден, None если не найден
+        :rtype: type[GenreInDB
+        """
+
+        result = await self.db.execute(select(Model).where(Model.name == name))
+        genre = result.scalar_one_or_none()
+
+        return self.response_schema.model_validate(genre) if genre else None
+
+    async def search_in_description(self, search_term: str) -> Union[Responce, None]:
+        """
+        Возвращает Жанр по поисковому запросу в описании.
+
+        :return: Жанр если найден, None если не найден
+        :rtype: type[GenreInDB]
+        """
+        raise NotImplementedError()

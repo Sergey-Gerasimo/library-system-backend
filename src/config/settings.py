@@ -1,4 +1,6 @@
 from envparse import Env
+import os
+
 
 env = Env()
 
@@ -13,6 +15,10 @@ class AppSettings:
     APP_RELOAD: bool = env.bool("APP_RELOAD", default=False)
 
     DEBUG: bool = env.bool("DEBUG", default=False)
+    LOG_FILE: str = os.path.join(env.str("LOG_PATH", default="./log"), "app.log")
+    ROTATION: str = env.str("LOG_ROTATION", default="100 MB")
+    RERETENTION: str = env.str("LOG_RERETENTION", default="30 days")
+    SERIALIZE_LOG: bool = env.bool("SERIALIZE_LOG", default=False)
 
 
 app_settings = AppSettings()
