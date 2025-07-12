@@ -13,6 +13,7 @@ class AppSettings:
     APP_HOST: str = env.str("APP_HOST", default="0.0.0.0")
     APP_PORT: int = env.int("APP_PORT", default=8000)
     APP_RELOAD: bool = env.bool("APP_RELOAD", default=False)
+    ENVIREMENT: str = env.str("ENVIRONMENT", default="local")
 
     DEBUG: bool = env.bool("DEBUG", default=False)
     LOG_FILE: str = os.path.join(env.str("LOG_PATH", default="./log"), "app.log")

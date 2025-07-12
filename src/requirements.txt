@@ -43,3 +43,9 @@ pytest-cov
 
 # логирование 
 loguru==0.7.3
+python-loki-client
+
+# prometheus 
+prometheus-client
+prometheus-fastapi-instrumentator
+starlette-prometheus

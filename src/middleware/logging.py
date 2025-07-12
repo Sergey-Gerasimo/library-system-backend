@@ -3,6 +3,8 @@ from fastapi import Request, Response
 from time import time
 import json
 
+MAX_LENTGHT_BODY = 256
+
 
 async def logging_middleware(request: Request, call_next):
     """
@@ -19,7 +21,7 @@ async def logging_middleware(request: Request, call_next):
             "url": str(request.url),
             "headers": dict(request.headers),
             "query_params": dict(request.query_params),
-            "body": request_body.decode() if request_body else None,
+            "body": request_body.decode()[:MAX_LENTGHT_BODY] if request_body else None,
         },
     )
 
@@ -50,7 +52,9 @@ async def logging_middleware(request: Request, call_next):
             "status_code": response.status_code,
             "process_time": process_time,
             "response_headers": dict(response.headers),
-            "response_body": response_body.decode() if response_body else None,
+            "response_body": (
+                response_body.decode()[:MAX_LENTGHT_BODY] if response_body else None
+            ),
         },
     )
 

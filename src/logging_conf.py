@@ -5,8 +5,10 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 import asyncio
+from utils.loki_sink import LokiHandler
 
 from config.settings import app_settings
+from config.loki_conf import loki_conf
 
 
 def serialize(record: Dict[str, Any]) -> str:
@@ -92,7 +94,20 @@ def setup_logging(
         backtrace=True,
         diagnose=True,
         enqueue=True,  # Асинхронная запись логов
+        serialize=False,
     )
+
+    loki_handler = LokiHandler(
+        url="http://loki:3100",
+        tags={
+            "application": app_settings.APP_NAME,
+            "envirement": app_settings.ENVIREMENT,
+            "service": "backend",
+        },
+        batch_size=20,
+        batch_interval=3,
+    )
+    logger.add(loki_handler, format="{message}", level="INFO")
 
     # Настройка для UVICORN логов
     logging.getLogger("uvicorn").handlers = [InterceptHandler()]
