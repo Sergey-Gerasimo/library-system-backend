@@ -1,5 +1,5 @@
 *venv*
-*.env*
+*.env
 *openid.json*
 *_data*
 *__pycache__*
