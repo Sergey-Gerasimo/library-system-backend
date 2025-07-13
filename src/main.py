@@ -1,16 +1,17 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.responses import PlainTextResponse
 from prometheus_client import generate_latest
 from contextlib import asynccontextmanager
 from loguru import logger
+from redis import Redis
+
 
 from api.v1.routers import api_router
+from api.dependencies import get_redis
 from config import app_settings
 from logging_conf import setup_logging
-from middleware.logging import logging_middleware
 from middleware.metrics import metrics_middleware
 from database import create_tables, async_engine
-from redis_cache import init_cache
 
 
 @asynccontextmanager
@@ -20,7 +21,6 @@ async def lifespan(app: FastAPI):
 
     """
     await create_tables(async_engine)
-    init_cache()
     yield
 
 
@@ -38,6 +38,12 @@ app = FastAPI(
 # app.middleware("http")(logging_middleware)
 app.middleware("http")(metrics_middleware)
 app.include_router(api_router, prefix="/api")
+
+
+@app.get("/health/redis")
+async def health_redis(redis: Redis = Depends(get_redis)):
+    await redis.ping()
+    return {"status": "ok"}
 
 
 @app.get("/metrics", response_class=PlainTextResponse)

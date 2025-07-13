@@ -41,6 +41,7 @@ async def get_redis() -> AsyncGenerator[Redis, Any]:
         decode_responses=True,  # для автоматического декодирования в строки
     )
     try:
+        await redis.ping()
         yield redis
     finally:
         await redis.close()

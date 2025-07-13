@@ -21,7 +21,6 @@ async def get_all_genre(
 ) -> List[GenreInDB]:
     cache_key = f"genres:all:user"
 
-    # Проверяем кэш
     if cached := await redis.get(cache_key):
         return [GenreInDB.model_validate_json(item) for item in json.loads(cached)]
 

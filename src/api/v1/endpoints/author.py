@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends
 from uuid import UUID
 from typing import List
-from fastapi_cache.decorator import cache
 from redis import Redis
 from pydantic import TypeAdapter
 from fastapi.encoders import jsonable_encoder

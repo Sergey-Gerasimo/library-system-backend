@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.responses import StreamingResponse, RedirectResponse
 from utils.logger import log_decorator, ContextLogger
-from fastapi_cache.decorator import cache
 from redis import Redis
 
 from uuid import UUID

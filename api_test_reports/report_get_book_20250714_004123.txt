@@ -1,0 +1,54 @@
+Тест: get_book
+Endpoint: http://192.168.0.120:8000/api/v1/books/get?book_id=f7614471-7ee9-4614-a8f3-d88ef4f330f6
+Дата и время: Mon Jul 14 00:41:23 MSK 2025
+Параметры: 10 параллельных запросов, всего 1000 запросов
+----------------------------------------
+This is ApacheBench, Version 2.3 <$Revision: 1923142 $>
+Copyright 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/
+Licensed to The Apache Software Foundation, http://www.apache.org/
+
+Benchmarking 192.168.0.120 (be patient)
+
+
+Server Software:        uvicorn
+Server Hostname:        192.168.0.120
+Server Port:            8000
+
+Document Path:          /api/v1/books/get?book_id=f7614471-7ee9-4614-a8f3-d88ef4f330f6
+Document Length:        21 bytes
+
+Concurrency Level:      10
+Time taken for tests:   7.525 seconds
+Complete requests:      70
+Failed requests:        0
+Non-2xx responses:      71
+Keep-Alive requests:    0
+Total transferred:      13703 bytes
+HTML transferred:       1491 bytes
+Requests per second:    9.30 [#/sec] (mean)
+Time per request:       1075.018 [ms] (mean)
+Time per request:       107.502 [ms] (mean, across all concurrent requests)
+Transfer rate:          1.78 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        3    7   4.7      5      27
+Processing:   112  997 161.6   1025    1233
+Waiting:       36  843 201.5    893    1111
+Total:        118 1004 160.8   1031    1247
+
+Percentage of the requests served within a certain time (ms)
+  50%   1031
+  66%   1071
+  75%   1096
+  80%   1096
+  90%   1154
+  95%   1194
+  98%   1233
+  99%   1247
+ 100%   1247 (longest request)
+
+
+----------------------------------------
+Дополнительная информация:
+Тест завершен в: Mon Jul 14 00:41:31 MSK 2025
