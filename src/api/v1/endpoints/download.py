@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.responses import StreamingResponse, RedirectResponse
 from utils.logger import log_decorator, ContextLogger
+from fastapi_cache.decorator import cache
 
 from uuid import UUID
 from services.services import StorageService
@@ -13,6 +14,7 @@ router = APIRouter(prefix="/download", tags=["download"])
 
 @router.get("/book/{book_id}/pdf")
 @log_decorator
+@cache(expire=60)
 async def download_book(
     book_id: UUID, storage_service: StorageService = Depends(get_storage_service)
 ):
@@ -49,6 +51,7 @@ async def download_book(
 
 @router.get("/book/{book_id}/cover")
 @log_decorator
+@cache(expire=60)
 async def download_cover(
     book_id: UUID, storage_service: StorageService = Depends(get_storage_service)
 ):

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
+from fastapi_cache.decorator import cache
 
 
 from schemas import BookInDB, BookCreate, BookUpdate, File as UniversalFile
@@ -30,6 +31,7 @@ async def create_book(
 
 
 @router.get("/get")
+@cache(expire=60)
 async def get_book(
     book_id: UUID,
     book_service: BookService = Depends(get_book_service),

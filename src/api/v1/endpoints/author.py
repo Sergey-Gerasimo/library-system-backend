@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from uuid import UUID
 from typing import List
+from fastapi_cache.decorator import cache
 
 from schemas import AuthorCreate, AuthorInDB, AuthorUpdate
 from api.dependencies import get_author_service
@@ -12,6 +13,7 @@ router = APIRouter(prefix="/authors", tags=["authors"])
 
 
 @router.get("/get")
+@cache(expire=60)
 async def get_auther(
     author_id: UUID,
     user_id: UUID,
@@ -23,6 +25,7 @@ async def get_auther(
 
 
 @router.get("/get_all")
+@cache(expire=60)
 async def get_all_authors(
     user_id: UUID,
     author_service: AuthorService = Depends(get_author_service),

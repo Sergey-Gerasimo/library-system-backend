@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from uuid import UUID
 from typing import List
+from fastapi_cache.decorator import cache
 
 from schemas import GenreCreate, GenreInDB, GenreUpdate
 from api.dependencies import get_genre_service
@@ -11,6 +12,7 @@ router = APIRouter(prefix="/genres", tags=["genres"])
 
 
 @router.get("/get_all")
+@cache(expire=60)
 async def get_all_genre(
     user_id: UUID,
     genre_service: GenreService = Depends(get_genre_service),
@@ -19,6 +21,7 @@ async def get_all_genre(
 
 
 @router.get("/get")
+@cache(expire=60)
 async def get_genre(
     genre_id: UUID,
     user_id: UUID,

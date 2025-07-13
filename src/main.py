@@ -10,6 +10,7 @@ from logging_conf import setup_logging
 from middleware.logging import logging_middleware
 from middleware.metrics import metrics_middleware
 from database import create_tables, async_engine
+from redis_cache import init_cache
 
 
 @asynccontextmanager
@@ -19,6 +20,7 @@ async def lifespan(app: FastAPI):
 
     """
     await create_tables(async_engine)
+    init_cache()
     yield
 
 
