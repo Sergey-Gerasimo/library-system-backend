@@ -1,0 +1,54 @@
+This is ApacheBench, Version 2.3 <$Revision: 1923142 $>
+Copyright 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/
+Licensed to The Apache Software Foundation, http://www.apache.org/
+
+Benchmarking 192.168.0.120 (be patient)
+Completed 100 requests
+Completed 200 requests
+Completed 300 requests
+Completed 400 requests
+Completed 500 requests
+Completed 600 requests
+Completed 700 requests
+Completed 800 requests
+Completed 900 requests
+Completed 1000 requests
+Finished 1000 requests
+
+
+Server Software:        uvicorn
+Server Hostname:        192.168.0.120
+Server Port:            8000
+
+Document Path:          /api/v1/authors/get_all?user_id=55ee934a-9416-4224-8390-63d048f0dcd4
+Document Length:        170 bytes
+
+Concurrency Level:      10
+Time taken for tests:   101.262 seconds
+Complete requests:      1000
+Failed requests:        0
+Keep-Alive requests:    0
+Total transferred:      394000 bytes
+HTML transferred:       170000 bytes
+Requests per second:    9.88 [#/sec] (mean)
+Time per request:       1012.622 [ms] (mean)
+Time per request:       101.262 [ms] (mean, across all concurrent requests)
+Transfer rate:          3.80 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        2   11  23.3      6     357
+Processing:   269  994 358.1    961    3342
+Waiting:      266  921 356.1    894    3294
+Total:        322 1005 357.0    975    3370
+
+Percentage of the requests served within a certain time (ms)
+  50%    975
+  66%   1062
+  75%   1146
+  80%   1236
+  90%   1444
+  95%   1640
+  98%   1983
+  99%   2267
+ 100%   3370 (longest request)

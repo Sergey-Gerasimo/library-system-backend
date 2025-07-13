@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Параметры тестирования
-CONCURRENCY=100    # Количество параллельных запросов
-REQUESTS=10000     # Общее количество запросов на endpoint
+CONCURRENCY=10    # Количество параллельных запросов
+REQUESTS=1000     # Общее количество запросов на endpoint
 SLEEP_INTERVAL=2  # Задержка между запусками тестов (в секундах)
 SERVER="http://192.168.0.120:8000"
 REPORT_DIR="api_test_reports"
@@ -33,11 +33,11 @@ clear
 > "${REPORT_DIR}/test_pids.txt"
 
 # Запуск тестов
-#run_test "/api/v1/download/book/${BOOK_UUID}/cover" "book_cover"
-#sleep $SLEEP_INTERVAL
+run_test "/api/v1/download/book/${BOOK_UUID}/cover" "book_cover"
+sleep $SLEEP_INTERVAL
 
-#run_test "/api/v1/download/book/${BOOK_UUID}/pdf" "book_pdf"
-#sleep $SLEEP_INTERVAL
+run_test "/api/v1/download/book/${BOOK_UUID}/pdf" "book_pdf"
+sleep $SLEEP_INTERVAL
 
 run_test "/api/v1/books/get?book_id=${BOOK_UUID}" "get_book"
 sleep $SLEEP_INTERVAL

@@ -3,10 +3,11 @@ from fastapi.security import OAuth2PasswordBearer
 from fastapi.responses import StreamingResponse, RedirectResponse
 from utils.logger import log_decorator, ContextLogger
 from fastapi_cache.decorator import cache
+from redis import Redis
 
 from uuid import UUID
 from services.services import StorageService
-from api.dependencies import get_storage_service
+from api.dependencies import get_storage_service, get_redis
 from schemas import FileType
 
 router = APIRouter(prefix="/download", tags=["download"])
@@ -14,10 +15,17 @@ router = APIRouter(prefix="/download", tags=["download"])
 
 @router.get("/book/{book_id}/pdf")
 @log_decorator
-@cache(expire=60)
 async def download_book(
-    book_id: UUID, storage_service: StorageService = Depends(get_storage_service)
+    book_id: UUID,
+    storage_service: StorageService = Depends(get_storage_service),
+    redis: Redis = Depends(get_redis),
 ):
+    cache_key = f"get:/book/{book_id}/pdf"
+    cached_link = await redis.get(cache_key)
+
+    if cached_link:
+        return RedirectResponse(url=cached_link)
+
     files = await storage_service.get_book_files(book_id)
 
     if not files:
@@ -40,6 +48,7 @@ async def download_book(
             download_filename=pdf_file.original_name,
         )
 
+        await redis.setex(cache_key, 55 * 60, download_url)
         # 4. Делаем редирект
         return RedirectResponse(url=download_url)
 
