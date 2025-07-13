@@ -150,7 +150,7 @@ class BookService:
                 metadata=translit_dict(file.headers),
             )
 
-            if upload_result:
+            if not upload_result:
                 self._logger.error("S3 upload failed", **log_context)
                 raise ServiceOperationError("Failed to upload file to S3")
 
@@ -164,6 +164,7 @@ class BookService:
                     mime_type=content_type,
                 )
             )
+
             self._logger.success("File uploaded successfully", **log_context)
             return s3_key
         except ServiceValidationError:
@@ -189,8 +190,6 @@ class BookService:
         """
         return f"{book_id}/{file_name}"
 
-    @handle_service_errors()
-    @handle_storage_service_errors()
     async def create(
         self,
         pdf: File,
@@ -275,13 +274,13 @@ class BookService:
                 upload_tasks = [
                     self._upload_file(
                         book_id=bookInDB.id,
-                        s3_key=self._create_s3_key(bookInDB.id, pdf.filename),
+                        s3_key=s3_pdf_key,
                         file=pdf,
                         file_type=FileType.PDF,
                     ),
                     self._upload_file(
                         book_id=bookInDB.id,
-                        s3_key=self._create_s3_key(bookInDB.id, cover.filename),
+                        s3_key=s3_cover_key,
                         file=cover,
                         file_type=FileType.COVER,
                     ),

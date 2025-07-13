@@ -33,7 +33,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.middleware("http")(logging_middleware)
+# app.middleware("http")(logging_middleware)
 app.middleware("http")(metrics_middleware)
 app.include_router(api_router, prefix="/api")
 

@@ -98,7 +98,7 @@ def setup_logging(
     )
 
     loki_handler = LokiHandler(
-        url="http://loki:3100",
+        url=loki_conf.LOKI_URL,
         tags={
             "application": app_settings.APP_NAME,
             "envirement": app_settings.ENVIREMENT,

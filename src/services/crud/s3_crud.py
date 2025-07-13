@@ -209,7 +209,6 @@ class S3CRUD:
         :raises S3ConnectionError: При проблемах с подключением
         :raises S3OperationError: При прочих ошибках загрузки
         """
-
         async with self._get_client() as client:
             put_params = {
                 "Bucket": self._bucket_name,
@@ -224,6 +223,7 @@ class S3CRUD:
                 put_params["Metadata"] = metadata
 
             await client.put_object(**put_params)
+
             return True
 
     @handle_storage_errors()
