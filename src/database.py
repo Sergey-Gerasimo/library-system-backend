@@ -7,8 +7,8 @@ from config import db_settings, app_settings
 async_engine = create_async_engine(
     db_settings.DATABSE_URL_asyncpg,
     echo=True if app_settings.DEBUG else False,
-    pool_size=5,
-    max_overflow=10,
+    pool_size=50,
+    max_overflow=100,
 )
 
 

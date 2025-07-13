@@ -74,14 +74,14 @@ def setup_logging(
     format_func = serialize if serialize_logs else formatter
 
     # Добавляем обработчик для консоли
-    # logger.add(
-    #     sys.stderr,
-    #     level=log_level,
-    #     format=format_func,
-    #     colorize=True,
-    #     backtrace=True,
-    #     diagnose=True,
-    # )
+    logger.add(
+        sys.stderr,
+        level=log_level,
+        format=format_func,
+        colorize=True,
+        backtrace=True,
+        diagnose=True,
+    )
 
     # Добавляем обработчик для файла
     logger.add(
