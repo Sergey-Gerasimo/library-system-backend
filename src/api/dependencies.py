@@ -41,7 +41,6 @@ async def init_redis_pool():
 
     connection_kwargs = {
         "decode_responses": True,
-        "max_connections": 20,
         "socket_connect_timeout": 5,
         "socket_timeout": 5,
     }

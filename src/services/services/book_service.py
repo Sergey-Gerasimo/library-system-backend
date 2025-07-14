@@ -340,7 +340,7 @@ class BookService:
     @handle_storage_service_errors()
     async def get_all(
         self,
-        filter: Filter,
+        filter: Optional[Filter] = None,
         limit: int = 100,
         offset: int = 0,
         order_by: str | None = None,

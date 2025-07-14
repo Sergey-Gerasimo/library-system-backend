@@ -1,17 +1,17 @@
 #!/bin/bash
 
 # Параметры тестирования
-CONCURRENCY=10    # Количество параллельных запросов
-REQUESTS=1000     # Общее количество запросов на endpoint
-SLEEP_INTERVAL=2  # Задержка между запусками тестов (в секундах)
-SERVER="http://192.168.0.120:8000"
+CONCURRENCY=100    # Количество параллельных запросов
+REQUESTS=10000     # Общее количество запросов на endpoint
+SLEEP_INTERVAL=0  # Задержка между запусками тестов (в секундах)
+SERVER="http://localhost:8000"
 REPORT_DIR="api_test_reports"
 
 # UUID для тестирования
-BOOK_UUID="f7614471-7ee9-4614-a8f3-d88ef4f330f6"
-AUTHOR_UUID="3e03a24e-2b83-49ff-ace7-136ee4bf5e99"
-GENRE_UUID="e6bfa49b-b7f3-490b-acc3-032d92745879"
-USER_UUID="55ee934a-9416-4224-8390-63d048f0dcd4"
+BOOK_UUID="889f31d5-fdcf-4519-a3db-222885521c13"
+AUTHOR_UUID="55ee934a-9416-4224-8390-63d048f0dcd4"
+GENRE_UUID="ec195ea5-2b5e-45ed-8c91-02e0429ca497"
+USER_UUID="ec195ea5-2b5e-45ed-8c91-02e0429ca497"
 
 # Создаем директорию для отчетов, если ее нет
 mkdir -p "$REPORT_DIR"

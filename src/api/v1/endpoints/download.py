@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.responses import StreamingResponse, RedirectResponse
 from utils.logger import log_decorator, ContextLogger
-from fastapi_cache.decorator import cache
 from redis import Redis
 
 from uuid import UUID
@@ -18,7 +17,13 @@ router = APIRouter(prefix="/download", tags=["download"])
 async def download_book(
     book_id: UUID,
     storage_service: StorageService = Depends(get_storage_service),
+    redis: Redis = Depends(get_redis),
 ):
+
+    cache_key = f"download_link:pdf:{book_id}"
+
+    if chached_url := await redis.get(cache_key):
+        return RedirectResponse(url=chached_url)
 
     files = await storage_service.get_book_files(book_id)
 
@@ -42,6 +47,8 @@ async def download_book(
             download_filename=pdf_file.original_name,
         )
 
+        await redis.setex(name=cache_key, time=55 * 60, value=download_url)
+
         return RedirectResponse(url=download_url)
 
     except Exception as e:
@@ -52,11 +59,16 @@ async def download_book(
 
 @router.get("/book/{book_id}/cover")
 @log_decorator
-@cache(expire=60)
 async def download_cover(
     book_id: UUID,
     storage_service: StorageService = Depends(get_storage_service),
+    redis: Redis = Depends(get_redis),
 ):
+
+    cache_key = f"downlad_link:cover:{book_id}"
+
+    if chached_url := await redis.get(cache_key):
+        return RedirectResponse(url=chached_url)
 
     files = await storage_service.get_book_files(book_id)
 
@@ -81,6 +93,8 @@ async def download_cover(
             expires_in=3600,
             download_filename=cover_file.original_name,
         )
+
+        await redis.setex(name=cache_key, time=55 * 60, value=download_url)
 
         return RedirectResponse(url=download_url)
     except Exception as e:

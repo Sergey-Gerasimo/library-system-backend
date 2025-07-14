@@ -2,21 +2,17 @@ from fastapi import APIRouter, Depends
 from uuid import UUID
 from typing import List
 from redis import Redis
-from pydantic import TypeAdapter
-from fastapi.encoders import jsonable_encoder
-from fastapi_cache.decorator import cache
+import json
+
 from schemas import AuthorCreate, AuthorInDB, AuthorUpdate
 from api.dependencies import get_author_service, get_redis
 from services.services import AuthorService
 
-from typing import Annotated
-import json
 
 router = APIRouter(prefix="/authors", tags=["authors"])
 
 
 @router.get("/get")
-@cache(expire=60)
 async def get_auther(
     author_id: UUID,
     user_id: UUID,
@@ -41,13 +37,24 @@ async def get_auther(
 
 
 @router.get("/get_all")
-@cache(expire=60)
 async def get_all_authors(
     user_id: UUID,
     author_service: AuthorService = Depends(get_author_service),
     redis: Redis = Depends(get_redis),
 ) -> List[AuthorInDB]:
+
+    cache_key = f"author:all"
+
+    if cached_authors := await redis.get(cache_key):
+        return [
+            AuthorInDB.model_validate_json(author)
+            for author in json.loads(cached_authors)
+        ]
+
     authors = await author_service.get_all()
+
+    authors_json = json.dumps([author.model_dump_json() for author in authors])
+    await redis.setex(name=cache_key, time=55 * 60, value=authors_json)
 
     return authors
 
