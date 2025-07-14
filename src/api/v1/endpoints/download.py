@@ -15,7 +15,6 @@ router = APIRouter(prefix="/download", tags=["download"])
 
 @router.get("/book/{book_id}/pdf")
 @log_decorator
-@cache(expire=60)
 async def download_book(
     book_id: UUID,
     storage_service: StorageService = Depends(get_storage_service),
@@ -57,7 +56,6 @@ async def download_book(
 async def download_cover(
     book_id: UUID,
     storage_service: StorageService = Depends(get_storage_service),
-    redis: Redis = Depends(get_redis),
 ):
 
     files = await storage_service.get_book_files(book_id)
