@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Параметры тестирования
-CONCURRENCY=100    # Количество параллельных запросов
-REQUESTS=10000     # Общее количество запросов на endpoint
+CONCURRENCY=10    # Количество параллельных запросов
+REQUESTS=1000     # Общее количество запросов на endpoint
 SLEEP_INTERVAL=0  # Задержка между запусками тестов (в секундах)
 SERVER="http://localhost:8000"
 REPORT_DIR="api_test_reports"

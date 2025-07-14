@@ -507,7 +507,32 @@
                     },
                     "unit": "percentunit"
                 },
-                "overrides": []
+                "overrides": [
+                    {
+                        "__systemRef": "hideSeriesFrom",
+                        "matcher": {
+                            "id": "byNames",
+                            "options": {
+                                "mode": "exclude",
+                                "names": [
+                                    "/api/v1/genres/get_all"
+                                ],
+                                "prefix": "All except:",
+                                "readOnly": true
+                            }
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.hideFrom",
+                                "value": {
+                                    "legend": false,
+                                    "tooltip": false,
+                                    "viz": true
+                                }
+                            }
+                        ]
+                    }
+                ]
             },
             "gridPos": {
                 "h": 7,
@@ -538,7 +563,7 @@
                     },
                     "editorMode": "code",
                     "exemplar": true,
-                    "expr": "(\n  sum by(path) (rate(fastapi_responses_total{app_name=\"book service\", status_code=~\"5..\", path!=\"/metrics\"}[5m]))\n  /\n  sum by(path) (rate(fastapi_responses_total{app_name=\"book service\", path!=\"/metrics\"}[5m]))\n)\n* 100  # Чтобы получить проценты",
+                    "expr": "(\n  sum by(path) (rate(fastapi_responses_total{app_name=\"book service\", status_code=~\"5..\", path!=\"/metrics\"}[5m]))\n  /\n  sum by(path) (rate(fastapi_responses_total{app_name=\"book service\", path!=\"/metrics\"}[5m]))\n) # Чтобы получить проценты",
                     "interval": "",
                     "legendFormat": "{{path}}",
                     "range": true,
@@ -606,7 +631,32 @@
                     },
                     "unit": "s"
                 },
-                "overrides": []
+                "overrides": [
+                    {
+                        "__systemRef": "hideSeriesFrom",
+                        "matcher": {
+                            "id": "byNames",
+                            "options": {
+                                "mode": "exclude",
+                                "names": [
+                                    "/metrics"
+                                ],
+                                "prefix": "All except:",
+                                "readOnly": true
+                            }
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.hideFrom",
+                                "value": {
+                                    "legend": false,
+                                    "tooltip": false,
+                                    "viz": true
+                                }
+                            }
+                        ]
+                    }
+                ]
             },
             "gridPos": {
                 "h": 8,
@@ -666,7 +716,7 @@
                         "barAlignment": 0,
                         "barWidthFactor": 0.6,
                         "drawStyle": "line",
-                        "fillOpacity": 0,
+                        "fillOpacity": 25,
                         "gradientMode": "none",
                         "hideFrom": {
                             "legend": false,
@@ -684,7 +734,7 @@
                         "spanNulls": false,
                         "stacking": {
                             "group": "A",
-                            "mode": "none"
+                            "mode": "normal"
                         },
                         "thresholdsStyle": {
                             "mode": "off"
@@ -716,9 +766,9 @@
             "options": {
                 "legend": {
                     "calcs": [],
-                    "displayMode": "list",
-                    "placement": "bottom",
-                    "showLegend": true
+                    "displayMode": "hidden",
+                    "placement": "right",
+                    "showLegend": false
                 },
                 "tooltip": {
                     "hideZeros": false,
@@ -764,7 +814,7 @@
                         "barAlignment": 0,
                         "barWidthFactor": 0.6,
                         "drawStyle": "line",
-                        "fillOpacity": 0,
+                        "fillOpacity": 25,
                         "gradientMode": "none",
                         "hideFrom": {
                             "legend": false,
@@ -782,7 +832,7 @@
                         "spanNulls": false,
                         "stacking": {
                             "group": "A",
-                            "mode": "none"
+                            "mode": "normal"
                         },
                         "thresholdsStyle": {
                             "mode": "off"
@@ -800,8 +850,7 @@
                                 "value": 80
                             }
                         ]
-                    },
-                    "unit": "reqps"
+                    }
                 },
                 "overrides": []
             },
@@ -815,9 +864,9 @@
             "options": {
                 "legend": {
                     "calcs": [],
-                    "displayMode": "list",
-                    "placement": "bottom",
-                    "showLegend": true
+                    "displayMode": "hidden",
+                    "placement": "right",
+                    "showLegend": false
                 },
                 "tooltip": {
                     "hideZeros": false,
@@ -1089,5 +1138,5 @@
     "timezone": "",
     "title": "FastAPI Observability",
     "uid": "fastapi-observability",
-    "version": 26
+    "version": 29
 }
