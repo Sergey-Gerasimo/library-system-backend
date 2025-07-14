@@ -16,6 +16,7 @@ from services.crud import (
     BookHistoryCRUD,
     S3CRUD,
 )
+from fastapi.exceptions import HTTPException
 from config import services_settings, s3_settings
 
 from fastapi import Depends
@@ -24,25 +25,65 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import AsyncSessionLocal
 
 from redis.asyncio import Redis
+from redis.asyncio.connection import ConnectionPool
 from typing import Any, AsyncGenerator
 
+from loguru import logger
 
-async def get_redis() -> AsyncGenerator[Redis, Any]:
-    """
-    Фнкция подключения к Redis.
-    :return: Redis
-    """
-    redis = Redis(
-        host=services_settings.REDIS_SETTINGS.HOST,
-        port=services_settings.REDIS_SETTINGS.PORT,
-        db=services_settings.REDIS_SETTINGS.DB,
-        password=services_settings.REDIS_SETTINGS.PASSWORD,
-        ssl=services_settings.REDIS_SETTINGS.IS_SSL,
-        decode_responses=True,  # для автоматического декодирования в строки
-    )
+_redis_pool: ConnectionPool | None = None
+
+
+async def init_redis_pool():
+    """Инициализация пула соединений при старте приложения"""
+    global _redis_pool
+
+    redis_url = f"redis://{services_settings.REDIS_SETTINGS.HOST}:{services_settings.REDIS_SETTINGS.PORT}/{services_settings.REDIS_SETTINGS.DB}"
+
+    connection_kwargs = {
+        "decode_responses": True,
+        "max_connections": 20,
+        "socket_connect_timeout": 5,
+        "socket_timeout": 5,
+    }
+
+    if services_settings.REDIS_SETTINGS.IS_SSL:
+        connection_kwargs["ssl"] = True
+        connection_kwargs["ssl_cert_reqs"] = None
+
     try:
-        await redis.ping()
+        _redis_pool = ConnectionPool.from_url(redis_url, **connection_kwargs)
+
+        # Проверяем подключение
+        async with Redis(connection_pool=_redis_pool) as redis:
+            await redis.ping()
+        logger.info("Redis connection pool initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize Redis pool: {str(e)}")
+        raise
+
+
+async def close_redis_pool():
+    """Закрытие пула соединений при завершении приложения"""
+    if _redis_pool:
+        await _redis_pool.disconnect()
+
+
+async def get_redis() -> AsyncGenerator[Redis, None]:
+    """
+    Корректное получение Redis соединения из пула
+    с обработкой ошибок и автоматическим возвратом в пул
+    """
+    if not _redis_pool:
+        raise HTTPException(
+            status_code=500, detail="Redis connection pool is not initialized"
+        )
+
+    redis = Redis(connection_pool=_redis_pool)
+    try:
         yield redis
+    except Exception as e:
+        logger.error(f"Redis operation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to execute Redis operation")
     finally:
         await redis.close()
 

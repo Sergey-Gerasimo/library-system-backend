@@ -7,7 +7,7 @@ from redis import Redis
 
 
 from api.v1.routers import api_router
-from api.dependencies import get_redis
+from api.dependencies import get_redis, init_redis_pool, close_redis_pool
 from config import app_settings
 from logging_conf import setup_logging
 from middleware.metrics import metrics_middleware
@@ -22,8 +22,10 @@ async def lifespan(app: FastAPI):
 
     """
     await create_tables(async_engine)
+    await init_redis_pool()
     init_cache()
     yield
+    await close_redis_pool()
 
 
 setup_logging()
