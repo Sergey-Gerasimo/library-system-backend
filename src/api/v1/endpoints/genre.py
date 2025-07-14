@@ -4,6 +4,7 @@ from uuid import UUID
 from typing import List
 from redis import Redis
 import json
+from fastapi_cache.decorator import cache
 
 from schemas import GenreCreate, GenreInDB, GenreUpdate
 from api.dependencies import get_genre_service, get_redis
@@ -14,42 +15,28 @@ router = APIRouter(prefix="/genres", tags=["genres"])
 
 
 @router.get("/get_all")
+@cache(expire=60)
 async def get_all_genre(
     user_id: UUID,
     genre_service: GenreService = Depends(get_genre_service),
     redis: Redis = Depends(get_redis),
 ) -> List[GenreInDB]:
-    cache_key = f"genres:all:user"
-
-    if cached := await redis.get(cache_key):
-        return [GenreInDB.model_validate_json(item) for item in json.loads(cached)]
 
     genres = await genre_service.get_all()
-
-    await redis.setex(
-        cache_key,
-        60 * 60 * 24,
-        json.dumps([jsonable_encoder(genre) for genre in genres]),
-    )
 
     return genres
 
 
 @router.get("/get")
+@cache(expire=60)
 async def get_genre(
     genre_id: UUID,
     user_id: UUID,
     genre_service: GenreService = Depends(get_genre_service),
     redis: Redis = Depends(get_redis),
 ) -> GenreInDB:
-    cache_key = f"genre:{genre_id}:user:{user_id}"
-
-    if cached := await redis.get(cache_key):
-        return GenreInDB.model_validate_json(cached)
 
     genre = await genre_service.get(id=genre_id)
-
-    await redis.setex(cache_key, 60 * 60 * 12, genre.model_dump_json())  # 12 часов
 
     return genre
 

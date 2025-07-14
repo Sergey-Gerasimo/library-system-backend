@@ -53,15 +53,12 @@ async def download_book(
 
 @router.get("/book/{book_id}/cover")
 @log_decorator
+@cache(expire=60)
 async def download_cover(
     book_id: UUID,
     storage_service: StorageService = Depends(get_storage_service),
     redis: Redis = Depends(get_redis),
 ):
-    cache_key = f"download_link:cover:{book_id}"
-
-    if cached_link := await redis.get(cache_key):
-        return RedirectResponse(url=cached_link)
 
     files = await storage_service.get_book_files(book_id)
 
@@ -86,7 +83,6 @@ async def download_cover(
             expires_in=3600,
             download_filename=cover_file.original_name,
         )
-        await redis.setex(cache_key, 55 * 60, download_url)
 
         return RedirectResponse(url=download_url)
     except Exception as e:

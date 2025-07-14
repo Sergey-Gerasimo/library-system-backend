@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 from redis import Redis
 import json
+from fastapi_cache.decorator import cache
 
 from schemas import BookInDB, BookCreate, BookUpdate, File as UniversalFile
 from api.dependencies import get_book_service, get_redis
@@ -31,38 +32,26 @@ async def create_book(
 
 
 @router.get("/get")
+@cache(expire=60)
 async def get_book(
     book_id: UUID,
     book_service: BookService = Depends(get_book_service),
     redis: Redis = Depends(get_redis),
 ) -> BookInDB:
 
-    cache_key = f"book:{book_id}"
-
-    if cached := await redis.get(cache_key):
-        return BookInDB.model_validate_json(cached)
-
     book = await book_service.get(id=book_id)
 
-    await redis.setex(cache_key, 60 * 15, book.model_dump_json())
     return book
 
 
 @router.get("/get_all")
+@cache(expire=60)
 async def get_all_books(
     book_service: BookService = Depends(get_book_service),
     redis: Redis = Depends(get_redis),
 ) -> list[BookInDB]:
-    cache_key = "books:all"
-
-    if cached := await redis.get(cache_key):
-        return [BookInDB.model_validate_json(item) for item in json.loads(cached)]
 
     books = await book_service.get_all()
-
-    await redis.setex(
-        cache_key, 60 * 5, json.dumps([book.model_dump() for book in books])
-    )
 
     return books
 
