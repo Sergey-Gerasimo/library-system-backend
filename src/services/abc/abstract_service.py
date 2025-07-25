@@ -68,9 +68,6 @@ class AbstractService(
         :type crud: AbstractCRUD
         :raises ServiceError: Если передан некорректный CRUD слой
         """
-        if not isinstance(crud, AbstractCRUD):
-            logger.error("Invalid CRUD layer provided", crud_type=type(crud).__name__)
-            raise ServiceError("Invalid CRUD layer provided")
 
         self._crud = crud
         self._logger = logger.bind(service=self.__class__.__name__)
@@ -151,6 +148,9 @@ class AbstractService(
 
             return result
 
+        except ServiceError as e:
+            raise
+
         except CRUDNotFoundError as e:
             self._logger.warning("Record not found (CRUD)", **log_context, error=str(e))
             raise ServiceNotFoundError(str(e)) from e
@@ -196,6 +196,9 @@ class AbstractService(
             self._logger.success("Record updated", **log_context)
             return result
 
+        except ServiceError as e:
+            raise
+
         except CRUDNotFoundError as e:
             self._logger.warning("Record not found (CRUD)", **log_context, error=str(e))
             raise ServiceNotFoundError(str(e)) from e
@@ -238,6 +241,9 @@ class AbstractService(
 
             self._logger.success("Record deleted", **log_context)
             return True
+
+        except ServiceError as e:
+            raise
 
         except CRUDNotFoundError as e:
             self._logger.warning("Record not found (CRUD)", **log_context, error=str(e))

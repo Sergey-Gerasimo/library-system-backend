@@ -131,7 +131,7 @@ class BookHistoryCRUD(AbstractCRUD[Model, Create, Update, Filter, Response]):
         result = await self.db.execute(
             select(self.model).where(self.model.book_id == book_id)
         )
-        return [self.response_schema.model_validate(h) for h in result.scalars()]
+        return [self.response_schema.model_validate(h) for h in result.scalars().all()]
 
     @handle_db_errors()
     async def get_by_user(self, user_id: UUID) -> list[Response]:
@@ -149,4 +149,4 @@ class BookHistoryCRUD(AbstractCRUD[Model, Create, Update, Filter, Response]):
         result = await self.db.execute(
             select(self.model).where(self.model.user_id == user_id)
         )
-        return [self.response_schema.model_validate(h) for h in result.scalars()]
+        return [self.response_schema.model_validate(h) for h in result.scalars().all()]

@@ -1,0 +1,99 @@
+@startuml Book_CRUD_Architecture
+
+skinparam class {
+    BackgroundColor White
+    ArrowColor #444444
+    BorderColor #444444
+}
+
+skinparam note {
+    BackgroundColor #F5F5F5
+    BorderColor #DDDDDD
+}
+
+' Main interfaces and abstract classes
+interface ICRUD<R, C, U, F> <<Protocol>> {
+    + {abstract} create(create_data: C): R
+    + {abstract} get_by_id(id: UUID): Optional[R]
+    + {abstract} update(id: UUID, update_data: U): Optional[R]
+    + {abstract} delete(id: UUID): bool
+    + {abstract} exists(**kwargs): bool
+    + {abstract} get_all(filter: Optional[F], limit: int, offset: int, order_by: Optional[str]): List[R]
+}
+
+abstract class AbstractCRUD<T, C, U, F, R> {
+    - db: AsyncSession
+    + {abstract} model(): type[T]
+    + {abstract} response_schema(): type[R]
+    + create(create_data: C): R
+    + get_by_id(id: UUID): Optional[R]
+    + update(id: UUID, update_data: U): Optional[R]
+    + delete(id: UUID): bool
+    + exists(**kwargs): bool
+    + get_all(filter: Optional[F], limit: int, offset: int, order_by: Optional[str]): List[R]
+    - _build_filter_conditions(filter: F): List[Any]
+}
+
+' Book-specific interfaces and implementations
+interface IBookCRUD <<Protocol>> {
+    + {abstract} get_by_title(title: str): Optional[Response]
+    + {abstract} get_by_author(author_id: UUID): list[Response]
+}
+
+class BookCRUD {
+    + model(): type[Model]
+    + response_schema(): type[Response]
+    + get_by_title(title: str): Optional[Response]
+    + get_by_author(author_id: UUID): list[Response]
+}
+
+' Relationships
+AbstractCRUD .up.|> ICRUD : implements
+AbstractCRUD ..|> ABC : extends
+
+IBookCRUD -up-|> ICRUD : extends
+BookCRUD -up-|> AbstractCRUD : extends
+BookCRUD .up.|> IBookCRUD : implements
+
+' Connections to models and schemas
+class Model << (M,#ADD1B2) >> {
+    SQLAlchemy Book model
+}
+
+class Create << (D,#FFD8B2) >> {
+    BookCreate
+}
+
+class Update << (D,#FFD8B2) >> {
+    BookUpdate
+}
+
+class Filter << (D,#FFD8B2) >> {
+    BookFilter
+}
+
+class Response << (D,#FFD8B2) >> {
+    BookInDB
+}
+
+BookCRUD --> Model : uses
+BookCRUD --> Create : uses
+BookCRUD --> Update : uses
+BookCRUD --> Filter : uses
+BookCRUD --> Response : returns
+
+' Notes
+note top of IBookCRUD
+  Extends base ICRUD with book-specific methods:
+  - get_by_title (exact match)
+  - get_by_author (all books by author)
+end note
+
+note top of BookCRUD
+  Concrete CRUD implementation for books:
+  - Inherits basic methods from AbstractCRUD
+  - Adds book-specific search methods
+  - Uses Book model and schemas
+end note
+
+@enduml

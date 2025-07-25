@@ -150,4 +150,4 @@ class BookFilesCRUD(AbstractCRUD[BookFile, Create, Update, Filter, Response]):
         result = await self.db.execute(
             select(self.model).where(self.model.book_id == book_id)
         )
-        return [self.response_schema.model_validate(f) for f in result.scalars()]
+        return [self.response_schema.model_validate(f) for f in result.scalars().all()]

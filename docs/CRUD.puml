@@ -1,0 +1,62 @@
+@startuml
+
+skinparam interface {
+  BackgroundColor White
+  ArrowColor #444444
+  BorderColor #444444
+  FontSize 13
+}
+hide circle
+left to right direction
+
+' Базовый интерфейс в центре
+interface "ICRUD<R,C,U,F>" as ICRUD #DDD {
+  + create(create_data: C): R
+  + get_by_id(id: UUID): Optional<R>
+  + update(id: UUID, update_data: U): Optional<R>
+  + delete(id: UUID): bool
+  + exists(**kwargs): bool
+  + get_all(filter: Optional[F], limit: int, offset: int, order_by: Optional[str]): List<R>
+}
+
+' Специализированные интерфейсы расположены вокруг базового
+interface "IAuthorCRUD" as IAuthor #F9E79F {
+  + get_by_name(name: str): Optional<AuthorInDB>
+  + search_in_bio(search_term: str): List<AuthorInDB>
+}
+
+interface "IBookCRUD" as IBook #AED6F1 {
+  + get_by_title(title: str): Optional<BookInDB>
+  + get_by_author(author_id: UUID): List<BookInDB>
+}
+
+interface "IBookFilesCRUD" as IFiles #D5F5E3 {
+  + get_by_storage_key(storage_key: str): Optional<BookFileInDB>
+  + get_by_book(book_id: UUID): List<BookFileInDB>
+}
+
+interface "IBookHistoryCRUD" as IHistory #FADBD8 {
+  + get_by_book(book_id: UUID): List<BookHistoryInDB>
+  + get_by_user(user_id: UUID): List<BookHistoryInDB>
+}
+
+interface "IGenreCRUD" as IGenre #E8DAEF {
+  + get_by_name(name: str): Optional<GenreInDB>
+  + search_in_description(search_term: str): Optional<GenreInDB>
+}
+
+interface "IUserCRUD" as IUser #F5B7B1 {
+  + get_by_username(username: str): Optional<UserInDB>
+  + get_by_email(email: str): Optional<UserInDB>
+}
+
+' Связи наследования
+ICRUD -up-|> IAuthor
+ICRUD -up-|> IBook
+ICRUD -down-|> IFiles
+ICRUD -down-|> IHistory
+ICRUD -right-|> IGenre
+ICRUD -left-|> IUser
+
+
+@enduml

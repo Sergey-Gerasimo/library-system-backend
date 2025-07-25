@@ -88,15 +88,7 @@ curl -X GET \
 APP_HOST=0.0.0.0
 APP_PORT=8000
 APP_RELOAD=True
-APP_NAME="book service"
 ENVIRONMENT=local  # local/staging/prod
-DEBUG=False
-
-# ===== Loging Settings =====
-LOG_FILE="/log"
-LOG_ROTATION="100 MB"
-LOG_RERETENTION="30 days"
-SERIALIZE_LOG=False
 
 # ===== PostgreSQL =====
 POSTGRES_HOST=postgres
@@ -104,18 +96,12 @@ POSTGRES_PORT=5432
 POSTGRES_USER=app_user
 POSTGRES_PASSWORD=strong_password_123!
 POSTGRES_DB=app_db
-POSTGRES_VERSION=15
-POSTGRES_TIMESCALEDB=false
 
-# Для SQLAlchemy (поддерживает и asyncpg и psycopg2)
-DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
-SYNC_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
 
 # ===== Redis =====
 REDIS_HOST=redis
 REDIS_PORT=6379
-REDIS_USER=redis_user
-REDIS_PASSWORD=redis_password_456
+REDIS_PASSWORD=redis_password_456!
 REDIS_DB=0
 REDIS_SSL=False
 REDIS_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${REDIS_DB}
@@ -127,30 +113,17 @@ MINIO_SECRET_KEY=minioadmin
 MINIO_API_PORT=9000
 MINIO_CONSOLE_PORT=9001
 
-# Облачный S3 (переопределить в prod)
 AWS_ACCESS_KEY_ID=${MINIO_ACCESS_KEY}
 AWS_SECRET_ACCESS_KEY=${MINIO_SECRET_KEY}
 S3_BUCKET_NAME=app-storage
 S3_REGION_NAME=us-east-1
 
-# Автодетект S3 эндпоинта
-S3_ENDPOINT_URL=http://localhost:9000
+S3_ENDPOINT_URL=http://minio:9000
 
 # ===== SSO Auth =====
 CLIENT_ID=""
 CLIENT_SECRET=""
 DOMAIN=""
-
-# ==== grafana ====
-GF_SECURITY_ADMIN_USER=admin
-GF_SECURITY_ADMIN_PASSWORD=admin
-
-# Prometheus
-PROMETHEUS_URL=http://prometheus:9090
-
-# Loki
-#LOKI_URL=http://host.docker.internal:3100
-LOKI_URL=http://loki:3100
 
 ```
 

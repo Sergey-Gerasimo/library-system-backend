@@ -146,4 +146,4 @@ class AuthorCRUD(AbstractCRUD[Model, Create, Update, Filter, Response]):
         result = await self.db.execute(
             select(self.model).where(self.model.bio.ilike(f"%{search_term}%"))
         )
-        return [self.response_schema.model_validate(a) for a in result.scalars()]
+        return [self.response_schema.model_validate(a) for a in result.scalars().all()]

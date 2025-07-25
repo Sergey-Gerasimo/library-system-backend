@@ -1,8 +1,12 @@
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.inspection import inspect
 from sqlalchemy import select, delete, update, and_
 from pydantic import BaseModel
-from typing import TypeVar, Generic, Optional, List, Any, Protocol
+from typing import TypeVar, Generic, Optional, List, Any, Protocol, Dict
+from sqlalchemy.ext.declarative import DeclarativeMeta
+from datetime import date, datetime
+from decimal import Decimal
 from abc import ABC, abstractmethod
 
 from services.exceptions import handle_db_errors
@@ -13,6 +17,39 @@ C = TypeVar("C", bound=BaseModel)  # Create Schema Type
 U = TypeVar("U", bound=BaseModel)  # Update Schema Type
 F = TypeVar("F", bound=BaseModel)  # Filter Schema Type
 R = TypeVar("R", bound=BaseModel)  # Response Schema Type
+
+
+def sqlalchemy_to_dict(model: Any) -> Dict[str, Any]:
+    """Преобразует SQLAlchemy модель в словарь с поддержкой специальных типов
+
+    :param model: SQLAlchemy модель или список моделей
+    :return: Словарь с данными модели
+    :raises ValueError: Если передан объект не SQLAlchemy модели
+    """
+
+    result = {}
+    for column in inspect(model).mapper.column_attrs:
+        value = getattr(model, column.key)
+
+        # Конвертация специальных типов
+        if isinstance(value, (datetime, date)):
+            result[column.key] = value.isoformat()
+        elif isinstance(value, Decimal):
+            result[column.key] = float(value)
+        elif hasattr(value, "__table__"):  # Для relationship полей
+            result[column.key] = sqlalchemy_to_dict(value)
+        else:
+            result[column.key] = value
+
+    return result
+
+
+def validate_uuid(uuid_str):
+    try:
+        uuid_obj = UUID(uuid_str)
+        return str(uuid_obj) == uuid_str  # Проверка точного соответствия
+    except ValueError:
+        return False
 
 
 class ICRUD(Protocol, Generic[R, C, U, F]):
@@ -189,7 +226,7 @@ class AbstractCRUD(ABC, Generic[T, C, U, F, R]):
         self.db.add(obj)
         await self.db.commit()
         await self.db.refresh(obj)
-        return self.response_schema.model_validate(obj)
+        return self.response_schema.model_validate(sqlalchemy_to_dict(obj))
 
     @handle_db_errors()
     async def get_by_id(self, id: UUID) -> Optional[R]:
@@ -201,9 +238,14 @@ class AbstractCRUD(ABC, Generic[T, C, U, F, R]):
         :rtype: Optional[R]
         :raises CRUDOperationError: При других ошибках работы с БД
         """
+
         result = await self.db.execute(select(self.model).where(self.model.id == id))
         obj = result.scalar_one_or_none()
-        return self.response_schema.model_validate(obj) if obj else None
+        return (
+            self.response_schema.model_validate(sqlalchemy_to_dict(obj))
+            if obj
+            else None
+        )
 
     @handle_db_errors()
     async def get_all(
@@ -240,8 +282,10 @@ class AbstractCRUD(ABC, Generic[T, C, U, F, R]):
         query = query.limit(limit).offset(offset)
 
         result = await self.db.execute(query)
+        items = result.scalars().all()
         return [
-            self.response_schema.model_validate(obj) for obj in result.scalars().all()
+            self.response_schema.model_validate(sqlalchemy_to_dict(obj))
+            for obj in items
         ]
 
     @handle_db_errors()
@@ -267,7 +311,7 @@ class AbstractCRUD(ABC, Generic[T, C, U, F, R]):
         )
         await self.db.commit()
         await self.db.refresh(obj)
-        return self.response_schema.model_validate(obj)
+        return self.response_schema.model_validate(sqlalchemy_to_dict(obj))
 
     @handle_db_errors()
     async def delete(self, id: UUID) -> bool:
@@ -287,7 +331,6 @@ class AbstractCRUD(ABC, Generic[T, C, U, F, R]):
         await self.db.commit()
         return True
 
-    @handle_db_errors()
     def _build_filter_conditions(self, filter: F) -> List[Any]:
         """Строит условия фильтрации для SQL запроса на основе схемы.
 

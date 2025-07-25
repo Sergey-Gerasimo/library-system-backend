@@ -145,4 +145,4 @@ class BookCRUD(AbstractCRUD[Model, Create, Update, Filter, Response]):
         result = await self.db.execute(
             select(self.model).where(self.model.author_id == author_id)
         )
-        return [self.response_schema.model_validate(b) for b in result.scalars()]
+        return [self.response_schema.model_validate(b) for b in result.scalars().all()]

@@ -239,12 +239,9 @@ def handle_service_errors(
             ...
     """
 
-    def decorator(
-        func: Callable[P, Coroutine[Any, Any, R]],
-    ) -> Callable[P, Coroutine[Any, Any, R]]:
-
+    def decorator(func):
         @wraps(func)
-        async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        async def wrapper(*args, **kwargs):
             func_name = func.__name__
             last_error = None
 
@@ -258,73 +255,36 @@ def handle_service_errors(
                             last_error=str(last_error) if last_error else None,
                         )
 
-                    result = await func(*args, **kwargs)
+                    return await func(*args, **kwargs)
 
-                    if log_errors and attempt > 0:
-                        logger.success(
-                            f"Retry successful for {func_name} after {attempt} attempts"
-                        )
+                except (
+                    ServiceNotFoundError,
+                    ServiceIntegrityError,
+                    ServiceValidationError,
+                ):
 
-                    return result
+                    raise
 
                 except CRUDNotFoundError as e:
-                    logger.error(
-                        f"Resource not found in {func_name}",
-                        error=str(e),
-                        args=args,
-                        kwargs=kwargs,
-                    )
                     raise ServiceNotFoundError(str(e)) from e
 
                 except CRUDIntegrityError as e:
-                    logger.error(
-                        f"Data integrity error in {func_name}",
-                        error=str(e),
-                        args=args,
-                        kwargs=kwargs,
-                    )
                     raise ServiceIntegrityError(str(e)) from e
 
                 except (CRUDConnectionError, CRUDRetryableError) as e:
                     last_error = e
                     if attempt < max_retries:
-                        logger.warning(
-                            f"Temporary error in {func_name}, retrying...",
-                            attempt=attempt + 1,
-                            max_retries=max_retries,
-                            error=str(e),
-                        )
                         await asyncio.sleep(retry_delay * (attempt + 1))
                         continue
-
-                    logger.error(
-                        f"Operation failed after {max_retries + 1} attempts in {func_name}",
-                        error=str(e),
-                        args=args,
-                        kwargs=kwargs,
-                    )
                     raise ServiceTemporaryError(str(e)) from e
 
                 except CRUDOperationError as e:
-                    logger.error(
-                        f"Operation failed in {func_name}",
-                        error=str(e),
-                        args=args,
-                        kwargs=kwargs,
-                    )
                     raise ServiceOperationError(str(e)) from e
 
                 except Exception as e:
-                    logger.critical(
-                        f"Unexpected error in {func_name}",
-                        error=str(e),
-                        args=args,
-                        kwargs=kwargs,
-                        exception_type=type(e).__name__,
-                    )
-                    raise ServiceError(f"Internal service error: {str(e)}") from e
+                    raise ServiceError(f"{func_name} failed: {str(e)}") from e
 
-            raise last_error if last_error else ServiceError("Unknown service error")
+            raise ServiceError("Unknown service error")
 
         return wrapper
 

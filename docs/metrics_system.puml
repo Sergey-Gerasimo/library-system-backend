@@ -1,0 +1,29 @@
+@startuml
+skinparam BackgroundColor #F9F9F9
+skinparam ArrowColor #555555
+skinparam ArrowThickness 1.3
+skinparam DefaultFontName Helvetica
+skinparam RoundCorner 10
+
+top to bottom direction
+
+component "FastAPI App" as app {
+  [Prometheus Client] #4E79A7
+  [Custom Metrics] #4E79A7
+}
+
+component "Redis" as redis #E15759
+component "PostgreSQL" as pg #E15759
+
+component "Prometheus" as prometheus {
+  [Scrape Manager] #E15759
+  [TSDB Storage] #E15759
+}
+
+component "Grafana" as grafana #E15759
+
+app --> prometheus : /metrics (HTTP)
+redis --> prometheus : через экспортер
+pg --> prometheus : через экспортер
+prometheus --> grafana : API запросы
+@enduml

@@ -1,0 +1,101 @@
+@startuml Author_CRUD_Architecture
+
+skinparam class {
+    BackgroundColor White
+    ArrowColor #444444
+    BorderColor #444444
+}
+
+skinparam note {
+    BackgroundColor #F5F5F5
+    BorderColor #DDDDDD
+}
+
+' Основные интерфейсы и абстрактные классы
+interface ICRUD<R, C, U, F> <<Protocol>> {
+    + {abstract} create(create_data: C): R
+    + {abstract} get_by_id(id: UUID): Optional[R]
+    + {abstract} update(id: UUID, update_data: U): Optional[R]
+    + {abstract} delete(id: UUID): bool
+    + {abstract} exists(**kwargs): bool
+    + {abstract} get_all(filter: Optional[F], limit: int, offset: int, order_by: Optional[str]): List[R]
+}
+
+abstract class AbstractCRUD<T, C, U, F, R> {
+    - db: AsyncSession
+    + {abstract} model(): type[T]
+    + {abstract} response_schema(): type[R]
+    + create(create_data: C): R
+    + get_by_id(id: UUID): Optional[R]
+    + update(id: UUID, update_data: U): Optional[R]
+    + delete(id: UUID): bool
+    + exists(**kwargs): bool
+    + get_all(filter: Optional[F], limit: int, offset: int, order_by: Optional[str]): List[R]
+    - _build_filter_conditions(filter: F): List[Any]
+}
+
+' Специфичные интерфейсы и реализации для авторов
+interface IAuthorCRUD <<Protocol>> {
+    + {abstract} get_by_name(name: str): Optional[Response]
+    + {abstract} search_in_bio(search_term: str): list[Response]
+}
+
+class AuthorCRUD {
+    + model(): type[Model]
+    + response_schema(): type[Response]
+    + get_by_name(name: str): Optional[Response]
+    + search_in_bio(search_term: str): list[Response]
+}
+
+' Связи и наследование
+AbstractCRUD .up.|> ICRUD : implements
+AbstractCRUD ..|> ABC : extends
+
+IAuthorCRUD -up-|> ICRUD : extends
+AuthorCRUD -up-|> AbstractCRUD : extends
+AuthorCRUD .up.|> IAuthorCRUD : implements
+
+' Связи с моделями и схемами
+class Model << (M,#ADD1B2) >> {
+    SQLAlchemy модель Author
+}
+
+class Create << (D,#FFD8B2) >> {
+    AuthorCreate
+}
+
+class Update << (D,#FFD8B2) >> {
+    AuthorUpdate
+}
+
+class Filter << (D,#FFD8B2) >> {
+    AuthorFilter
+}
+
+class Response << (D,#FFD8B2) >> {
+    AuthorInDB
+}
+
+AuthorCRUD --> Model : uses
+AuthorCRUD --> Create : uses
+AuthorCRUD --> Update : uses
+AuthorCRUD --> Filter : uses
+AuthorCRUD --> Response : returns
+
+' Заметки
+note top of IAuthorCRUD
+  Расширяет базовый ICRUD специфичными
+  методами для работы с авторами:
+  - get_by_name (точное совпадение)
+  - search_in_bio (поиск в биографии)
+end note
+
+note top of AuthorCRUD
+  Конкретная реализация операций CRUD
+  для работы с авторами:
+  - Наследует базовые методы от AbstractCRUD
+  - Добавляет специфичные методы поиска
+  - Использует Author модель и схемы
+end note
+
+@enduml

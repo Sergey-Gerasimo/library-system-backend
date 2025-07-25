@@ -1,0 +1,88 @@
+@startuml Clean Architecture Book Service
+
+skinparam monochrome true
+skinparam componentStyle uml2
+
+package "Interface Adapters" {
+    component "API Router" as api_router {
+        [Book Router]
+        [Author Router]
+        [Genre Router]
+        [User Router]
+        [Storage Router]
+    }
+}
+
+package "Application Business Rules" {
+    component "Book Service" as booksvc {
+        component "Book Use Cases" as book_usecases
+        component "File Use Cases" as file_usecases
+    }
+
+    component "Author Service" as authorsvc {
+        component "Author Use Cases" as author_usecases
+    }
+
+    component "Genre Service" as genresvc {
+        component "Genre Use Cases" as genre_usecases
+    }
+
+    component "User Service" as usersvc {
+        component "User Use Cases" as user_usecases
+    }
+
+    component "Storage Service" as storagesvc {
+        component "Storage Use Cases" as storage_usecases
+    }
+}
+
+package "Enterprise Business Rules" {
+    interface "Book Repository(IBookCRUD)" as book_repo
+    interface "Author Repository(IAuthorCRUD)" as author_repo
+    interface "Genre Repository(IGenreCRUD)" as genre_repo
+    interface "User Repository(IUserCRUD)" as user_repo
+    interface "File Repository(IBookFileCRUD)" as file_repo
+}
+
+package "Frameworks & Drivers" {
+    database "SQL Database" as sql_db {
+        frame "SQLAlchemy" as sqlalchemy {
+            component "Book Model"
+            component "Author Model"
+            component "Genre Model"
+            component "User Model"
+            component "File Model"
+        }
+    }
+
+    cloud "S3 Storage" as s3 {
+        component "S3 Client"
+    }
+}
+
+' Connections
+[Book Router] --> book_usecases : calls
+[Author Router] --> author_usecases : calls
+[Genre Router] --> genre_usecases : calls
+[User Router] --> user_usecases : calls
+[Storage Router] --> storage_usecases : calls
+
+book_usecases --> book_repo : implements
+author_usecases --> author_repo : implements
+genre_usecases --> genre_repo : implements
+user_usecases --> user_repo : implements
+file_usecases --> file_repo : implements
+storage_usecases --> file_repo : implements
+
+book_repo <|.. sqlalchemy : implements
+author_repo <|.. sqlalchemy : implements
+genre_repo <|.. sqlalchemy : implements
+user_repo <|.. sqlalchemy : implements
+file_repo <|.. sqlalchemy : implements
+file_repo <|.. s3 : implements
+
+book_usecases --> author_repo : depends
+book_usecases --> genre_repo : depends
+book_usecases --> file_repo : depends
+
+@enduml

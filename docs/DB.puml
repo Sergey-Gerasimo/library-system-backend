@@ -1,0 +1,112 @@
+@startuml Bookstore ER Diagram
+skinparam linetype ortho
+skinparam packageStyle rectangle
+hide circle
+hide empty members
+
+' Сущности
+entity "users" as users {
+  * id : UUID (PK)
+  --
+  * username : String(50)
+  * email : String(100)
+  * hashed_password : String(255)
+  full_name : String(100)
+  * roles : UserRole[]
+  * is_active : Boolean
+}
+
+entity "books" as books {
+  * id : UUID (PK)
+  --
+  * title : String(200)
+  description : Text
+  author_id : UUID (FK)
+  genre_id : UUID (FK)
+  * year : Integer
+  * is_published : Boolean
+  * created_at : DateTime
+}
+
+entity "authors" as authors {
+  * id : UUID (PK)
+  --
+  * name : String(100)
+  bio : Text
+}
+
+entity "genres" as genres {
+  * id : UUID (PK)
+  --
+  * name : String(50)
+  description : Text
+}
+
+entity "book_files" as book_files {
+  * id : UUID (PK)
+  --
+  * book_id : UUID (FK)
+  * storage_key : String(255)
+  * file_type : FileType
+  * original_name : String(100)
+  * size_bytes : Integer
+  * mime_type : String(50)
+  * created_at : DateTime
+}
+
+entity "book_history" as book_history {
+  * id : UUID (PK)
+  --
+  * book_id : UUID (FK)
+  * user_id : UUID (FK)
+  * action : BookHistoryAction
+  * changed_at : DateTime
+  old_values : JSON
+  new_values : JSON
+}
+
+' Перечисления
+enum "UserRole" {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum "FileType" {
+  COVER
+  PDF
+}
+
+enum "BookHistoryAction" {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+' Связи
+users ||--o{ book_history : "changed_books"
+books ||--o{ book_files : "files"
+books ||--o{ book_history : "history"
+authors ||--o{ books : "books"
+genres ||--o{ books : "books"
+
+' Примечания
+note top of users
+  Таблица пользователей системы
+  с ролевой моделью
+end note
+
+note right of book_files
+  Хранит метаданные файлов:
+  - Обложки (COVER)
+  - PDF-файлы
+end note
+
+note left of book_history
+  История изменений книг:
+  - Кто изменил
+  - Когда
+  - Какие поля
+end note
+
+@enduml
